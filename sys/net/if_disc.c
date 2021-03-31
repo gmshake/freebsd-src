@@ -184,8 +184,13 @@ discoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
+	else {
 		af = dst->sa_family;
+#if defined(INET) && defined(INET6)
+		if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
+			af = AF_INET;
+#endif
+	}
 
 	if (bpf_peers_present(ifp->if_bpf))
 		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m);

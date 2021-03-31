@@ -269,5 +269,8 @@ atf_init_test_cases()
 	atf_add_test_case "fwd_ip_icmp_gw_slow_success"
 }
 
+# TODO add tests for IPv4 network with IPv6 nethop
+# TODO IPv4 source address selection with unnumbered interface (has IPv6 addresses but no IPv4 addresses)
+
 # end
 

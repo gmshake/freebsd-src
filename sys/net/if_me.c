@@ -27,6 +27,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_inet6.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/jail.h>
@@ -539,8 +541,13 @@ me_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
+	else {
 		af = dst->sa_family;
+#if defined(INET) && defined(INET6)
+		if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
+			af = AF_INET;
+#endif
+	}
 	m->m_pkthdr.csum_data = af;
 	return (ifp->if_transmit(ifp, m));
 }
