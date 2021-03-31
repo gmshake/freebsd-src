@@ -269,5 +269,9 @@ atf_init_test_cases()
 	atf_add_test_case "fwd_ip_icmp_gw_slow_success"
 }
 
+# TODO add tests for IPv4 network with IPv6 nethop
+# TODO tests for ip_output / ip_input / ip_tryforward / ip_forward / ICMP route redirect with unnumbered interface
+# FIXME select IPv4 source address with unnumbered interface
+
 # end
 

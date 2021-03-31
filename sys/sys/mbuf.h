@@ -146,8 +146,8 @@ struct m_snd_tag {
 
 /*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
- * Size ILP32: 48
- *	 LP64: 56
+ * Size ILP32: 48 + 8
+ *	 LP64: 56 + 8
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -196,6 +196,14 @@ struct pkthdr {
 		uintptr_t unintptr[1];
 		void 	*ptr;
 	} PH_loc;
+	union {
+		uint8_t		 sa_family;	/* address family */
+		uint16_t PH_XXX_sixteen[4];
+		uint32_t PH_XXX_thirtytwo[2];
+		uint64_t PH_XXX_sixtyfour[1];
+		uintptr_t PH_XXX_unintptr[1];
+		void 	*PH_XXX_ptr;
+	};
 };
 #define	ether_vtag	PH_per.sixteen[0]
 #define tcp_tun_port	PH_per.sixteen[0] /* outbound */

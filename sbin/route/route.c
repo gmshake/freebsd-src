@@ -1165,6 +1165,10 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 	char *q;
 #endif
 
+#ifdef INET6
+	struct sockaddr_in6 *sin6;
+#endif
+
 	if (idx < 0 || idx >= RTAX_MAX)
 		usage("internal error");
 	if (af == 0) {
@@ -1300,6 +1304,26 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 	}
 	if (inet_aton(str, &sin->sin_addr) != 0)
 		return (1);
+
+#ifdef INET6
+	sin6 = (struct sockaddr_in6 *)(void *)sa;
+	if (inet_pton(AF_INET6, str, &sin6->sin6_addr) != 0)
+		return (1);
+
+	struct addrinfo hints, *res;
+	int ecode;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	ecode = getaddrinfo(str, NULL, &hints, &res);
+	if (ecode != 0 || res->ai_family != AF_INET6 ||
+		    res->ai_addrlen != sizeof(struct sockaddr_in6))
+			errx(EX_OSERR, "%s: %s", str, gai_strerror(ecode));
+	memcpy(sa, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+	return (1);
+#endif
 
 	hp = gethostbyname(str);
 	if (hp != NULL) {

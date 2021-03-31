@@ -370,6 +370,11 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		eh = mtod(m, struct ether_header *);
 		memcpy(eh, phdr, hlen);
+		// XXX restore ether_type, for ipv4 packet with ipv6 ND resolve
+		if (m->m_pkthdr.sa_family == AF_INET && dst->sa_family == AF_INET6) {
+			uint16_t etype = htons(ETHERTYPE_IP);
+			memcpy(&eh->ether_type, &etype, sizeof(eh->ether_type));
+		}
 	}
 
 	/*

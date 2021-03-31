@@ -143,7 +143,7 @@ ip_redir_alloc(struct mbuf *m, struct nhop_object *nh,
 
 		if (nh_ia != NULL &&
 		    (src & nh_ia->ia_subnetmask) == nh_ia->ia_subnet) {
-			if (nh->nh_flags & NHF_GATEWAY)
+			if (nh->nh_flags & NHF_GATEWAY && nh->gw_sa.sa_family == AF_INET) // FIXME AF_INET6 ???
 				*addr = nh->gw4_sa.sin_addr.s_addr;
 			else
 				*addr = ip->ip_dst.s_addr;
@@ -199,7 +199,11 @@ ip_tryforward(struct mbuf *m)
 	struct ip *ip;
 	struct mbuf *m0 = NULL;
 	struct nhop_object *nh = NULL;
-	struct sockaddr_in dst;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+		struct sockaddr_in6 sin6;
+	} dst;
 	struct in_addr dest, odest, rtdest;
 	uint16_t ip_len, ip_off;
 	int error = 0;
@@ -422,19 +426,27 @@ passout:
 	ip_off = ntohs(ip->ip_off);
 
 	bzero(&dst, sizeof(dst));
-	dst.sin_family = AF_INET;
-	dst.sin_len = sizeof(dst);
-	if (nh->nh_flags & NHF_GATEWAY)
-		dst.sin_addr = nh->gw4_sa.sin_addr;
-	else
-		dst.sin_addr = dest;
+	dst.sin.sin_family = AF_INET;
+	dst.sin.sin_len = sizeof(struct sockaddr_in);
+	if (nh->nh_flags & NHF_GATEWAY) {
+		if (nh->gw_sa.sa_family == AF_INET)
+			dst.sin.sin_addr = nh->gw4_sa.sin_addr;
+		else { // AF_INET6
+			bzero(&dst.sin6, sizeof(struct sockaddr_in6));
+			dst.sin6.sin6_family = AF_INET6;
+			dst.sin6.sin6_len = sizeof(struct sockaddr_in6);
+			dst.sin6.sin6_addr = nh->gw6_sa.sin6_addr;
+			dst.sin6.sin6_scope_id = nh->gw6_sa.sin6_scope_id;
+		}
+	} else
+		dst.sin.sin_addr = dest;
 
 	/*
 	 * Handle redirect case.
 	 */
 	redest.s_addr = 0;
 	if (V_ipsendredirects && (nh->nh_ifp == m->m_pkthdr.rcvif))
-		mcopy = ip_redir_alloc(m, nh, ip, &redest.s_addr);
+		mcopy = ip_redir_alloc(m, nh, ip, &redest.s_addr); // FIXME redirect without interface ip address (unnumbered interface)
 
 	/*
 	 * Check if packet fits MTU or if hardware will fragment for us
@@ -448,8 +460,10 @@ passout:
 		 * Send off the packet via outgoing interface
 		 */
 		IP_PROBE(send, NULL, NULL, ip, nh->nh_ifp, ip, NULL);
-		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
-		    (struct sockaddr *)&dst, NULL);
+		/* RFC5549 */
+		m->m_pkthdr.sa_family = AF_INET;
+
+		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, &dst.sa, NULL);
 	} else {
 		/*
 		 * Handle EMSGSIZE with icmp reply needfrag for TCP MTU discovery
@@ -483,8 +497,11 @@ passout:
 				IP_PROBE(send, NULL, NULL,
 				    mtod(m, struct ip *), nh->nh_ifp,
 				    mtod(m, struct ip *), NULL);
+				/* RFC5549 */
+				m->m_pkthdr.sa_family = AF_INET;
+
 				error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
-				    (struct sockaddr *)&dst, NULL);
+				    &dst.sa, NULL);
 				if (error)
 					break;
 			} while ((m = m0) != NULL);

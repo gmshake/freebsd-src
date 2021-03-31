@@ -212,7 +212,7 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, int flags,
 
 static int
 ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
-    const struct sockaddr_in *gw, struct route *ro, bool stamp_tag)
+    const struct sockaddr *gw, struct route *ro, bool stamp_tag)
 {
 #ifdef KERN_TLS
 	struct ktls_session *tls = NULL;
@@ -273,7 +273,10 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 		m->m_pkthdr.csum_flags |= CSUM_SND_TAG;
 	}
 
-	error = (*ifp->if_output)(ifp, m, (const struct sockaddr *)gw, ro);
+	/* RFC5549 */
+	m->m_pkthdr.sa_family = AF_INET;
+
+	error = (*ifp->if_output)(ifp, m, gw, ro);
 
 done:
 	/* Check for route change invalidating send tags. */
@@ -329,8 +332,12 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	int mtu = 0;
 	int error = 0;
 	int vlan_pcp = -1;
-	struct sockaddr_in *dst, sin;
-	const struct sockaddr_in *gw;
+	struct sockaddr_in *dst;
+	union {
+		struct sockaddr_in sin;
+		struct sockaddr_in6 sin6;
+	} ss;
+	const struct sockaddr *gw;
 	struct in_ifaddr *ia = NULL;
 	struct in_addr src;
 	int isbroadcast;
@@ -389,14 +396,14 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	if (ro != NULL)
 		dst = (struct sockaddr_in *)&ro->ro_dst;
 	else
-		dst = &sin;
+		dst = &ss.sin;
 	if (ro == NULL || ro->ro_nh == NULL) {
 		bzero(dst, sizeof(*dst));
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(*dst);
 		dst->sin_addr = ip->ip_dst;
 	}
-	gw = dst;
+	gw = (const struct sockaddr *)dst;
 again:
 	/*
 	 * Validate route against routing table additions;
@@ -500,11 +507,11 @@ again:
 		counter_u64_add(ro->ro_nh->nh_pksent, 1);
 		rt_update_ro_flags(ro);
 		if (ro->ro_nh->nh_flags & NHF_GATEWAY)
-			gw = &ro->ro_nh->gw4_sa;
+			gw = &ro->ro_nh->gw_sa;
 		if (ro->ro_nh->nh_flags & NHF_HOST)
 			isbroadcast = (ro->ro_nh->nh_flags & NHF_BROADCAST);
-		else if (ifp->if_flags & IFF_BROADCAST)
-			isbroadcast = in_ifaddr_broadcast(gw->sin_addr, ia);
+		else if (ifp->if_flags & IFF_BROADCAST && gw->sa_family == AF_INET)
+			isbroadcast = in_ifaddr_broadcast(((const struct sockaddr_in *)gw)->sin_addr, ia);
 		else
 			isbroadcast = 0;
 		if (ro->ro_nh->nh_flags & NHF_HOST)
@@ -512,6 +519,11 @@ again:
 		else
 			mtu = ifp->if_mtu;
 		src = IA_SIN(ia)->sin_addr;
+		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY) { // FIXME unnumbered interface, use loopback alias address instead ???
+			IPSTAT_INC(ips_badaddr);
+			error = EADDRNOTAVAIL;
+			goto bad;
+		}
 	} else {
 		struct nhop_object *nh;
 
@@ -539,14 +551,33 @@ again:
 		 * In case if pfil(9) sends us back to beginning of the
 		 * function, the dst would be rewritten by ip_output_pfil().
 		 */
-		MPASS(dst == &sin);
-		if (nh->nh_flags & NHF_GATEWAY)
-			dst->sin_addr = nh->gw4_sa.sin_addr;
+		MPASS(dst == &ss);
+		MPASS(gw == &ss);
+		if (nh->nh_flags & NHF_GATEWAY) {
+			if (nh->gw_sa.sa_family == AF_INET) {
+				bzero(&ss.sin, sizeof(struct sockaddr_in));
+				ss.sin.sin_family = AF_INET;
+				ss.sin.sin_len = sizeof(struct sockaddr_in);
+				ss.sin.sin_addr = nh->gw4_sa.sin_addr;
+			} else { // AF_INET6
+				bzero(&ss.sin6, sizeof(struct sockaddr_in6));
+				ss.sin6.sin6_family = AF_INET6;
+				ss.sin6.sin6_len = sizeof(struct sockaddr_in6);
+				ss.sin6.sin6_addr = nh->gw6_sa.sin6_addr;
+				ss.sin6.sin6_scope_id = nh->gw6_sa.sin6_scope_id;
+			}
+		}
+
 		ia = ifatoia(nh->nh_ifa);
 		src = IA_SIN(ia)->sin_addr;
+		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY) { // FIXME unnumbered interface, use loopback alias address instead ???
+			IPSTAT_INC(ips_badaddr);
+			error = EADDRNOTAVAIL;
+			goto bad;
+		}
 		isbroadcast = (((nh->nh_flags & (NHF_HOST | NHF_BROADCAST)) ==
 		    (NHF_HOST | NHF_BROADCAST)) ||
-		    ((ifp->if_flags & IFF_BROADCAST) &&
+		    ((ifp->if_flags & IFF_BROADCAST) && nh->gw_sa.sa_family == AF_INET &&
 		    in_ifaddr_broadcast(dst->sin_addr, ia)));
 	}
 
@@ -562,7 +593,7 @@ again:
 		 * still points to the address in "ro".  (It may have been
 		 * changed to point to a gateway address, above.)
 		 */
-		gw = dst;
+		gw = (const struct sockaddr *)dst;
 		/*
 		 * See if the caller provided any multicast options
 		 */
@@ -722,7 +753,7 @@ sendit:
 				RO_NHFREE(ro);
 				ro->ro_prepend = NULL;
 			}
-			gw = dst;
+			gw = (const struct sockaddr *)dst;
 			ip = mtod(m, struct ip *);
 			goto again;
 		}

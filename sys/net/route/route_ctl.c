@@ -106,6 +106,11 @@ SYSCTL_UINT(_net_route, OID_AUTO, multipath, _MP_FLAGS | CTLFLAG_VNET,
     &VNET_NAME(rib_route_multipath), 0, "Enable route multipath");
 #undef _MP_FLAGS
 
+#define V_rib_route_rfc5549  VNET(rib_route_rfc5549)
+VNET_DEFINE(u_int, rib_route_rfc5549) = 1;
+SYSCTL_UINT(_net_route, OID_AUTO, rfc5549, CTLFLAG_RW | CTLFLAG_VNET,
+    &VNET_NAME(rib_route_rfc5549), 0, "Enable rfc5549 IPv6 Next Hop address");
+
 /* Routing table UMA zone */
 VNET_DEFINE_STATIC(uma_zone_t, rtzone);
 #define	V_rtzone	VNET(rtzone)
@@ -195,6 +200,18 @@ get_rnh(uint32_t fibnum, const struct rt_addrinfo *info)
 	rnh = rt_tables_get_rnh(fibnum, dst->sa_family);
 
 	return (rnh);
+}
+
+static bool
+rib_can_ipv6_nexthop_address(struct rib_head *rh)
+{
+	int result;
+
+	CURVNET_SET(rh->rib_vnet);
+	result = !!V_rib_route_rfc5549;
+	CURVNET_RESTORE();
+
+	return (result);
 }
 
 #ifdef ROUTE_MPATH
@@ -590,8 +607,10 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 	if ((flags & RTF_GATEWAY) && !gateway)
 		return (EINVAL);
 	if (dst && gateway && (dst->sa_family != gateway->sa_family) && 
-	    (gateway->sa_family != AF_UNSPEC) && (gateway->sa_family != AF_LINK))
-		return (EINVAL);
+	    (gateway->sa_family != AF_UNSPEC) && (gateway->sa_family != AF_LINK)) {
+		if (dst->sa_family == AF_INET && gateway->sa_family == AF_INET6 && !rib_can_ipv6_nexthop_address(rnh))
+			return (EINVAL);
+	}
 
 	if (dst->sa_len > sizeof(((struct rtentry *)NULL)->rt_dstb))
 		return (EINVAL);
