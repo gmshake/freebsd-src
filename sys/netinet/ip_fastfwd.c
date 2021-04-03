@@ -466,8 +466,8 @@ passout:
 		IP_PROBE(send, NULL, NULL, ip, nh->nh_ifp, ip, NULL);
 #ifdef INET6
 		/* RFC5549 */
-		// XXX: save the af in the inbound pkt csum data
-		m->m_pkthdr.csum_data = AF_INET;
+		if (dst.sa.sa_family == AF_INET6)
+			m->m_pkthdr.mhdr_flags |= HDR_IPV4_IPV6_NHOP;
 #endif
 
 		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, &dst.sa, NULL);
@@ -506,10 +506,9 @@ passout:
 				    mtod(m, struct ip *), NULL);
 #ifdef INET6
 				/* RFC5549 */
-				// XXX: save the af in the inbound pkt csum data
-				m->m_pkthdr.csum_data = AF_INET;
+				if (dst.sa.sa_family == AF_INET6)
+					m->m_pkthdr.mhdr_flags |= HDR_IPV4_IPV6_NHOP;
 #endif
-
 				error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
 				    &dst.sa, NULL);
 				if (error)

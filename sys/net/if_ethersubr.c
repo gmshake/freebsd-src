@@ -293,8 +293,9 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 
 	af = dst->sa_family;
 #if defined(INET) && defined(INET6)
-	// XXX restore address family from inbound pkt checksum
-	if (m->m_pkthdr.csum_dat == AF_INET && af == AF_INET6)
+	// RFC5549
+	// XXX restore address family
+	if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
 		af = AF_INET;
 #endif
 	phdr = NULL;

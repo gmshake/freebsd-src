@@ -210,6 +210,9 @@ struct pkthdr {
 #define	lro_etype	PH_loc.sixteen[3] /* inbound during LRO (no reassembly) */
 /* Note PH_loc is used during IP reassembly (all 8 bytes as a ptr) */
 
+// FIXME better naming ???
+#define mhdr_flags	PH_loc.sixteen[3]
+
 /*
  * TLS records for TLS 1.0-1.2 can have the following header lengths:
  * - 5 (AES-CBC with implicit IV)
@@ -719,6 +722,13 @@ m_epg_pagelen(const struct mbuf *m, int pidx, int pgoff)
 #define	CSUM_UDP_IPV6		CSUM_IP6_UDP
 #define	CSUM_TCP_IPV6		CSUM_IP6_TCP
 #define	CSUM_SCTP_IPV6		CSUM_IP6_SCTP
+
+
+/*
+ * header flags
+ */
+#define HDR_IPV4_IPV6_NHOP	0x0001	/* RFC5549 IPv6 next hop */
+
 
 /*
  * mbuf types describing the content of the mbuf (including external storage).

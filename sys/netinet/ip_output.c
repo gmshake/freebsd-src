@@ -275,7 +275,8 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 
 #ifdef INET6
 	/* RFC5549 */
-	m->m_pkthdr.csum_data = AF_INET;
+	if (gw->sa_family == AF_INET6)
+		m->m_pkthdr.mhdr_flags |= HDR_IPV4_IPV6_NHOP;
 #endif
 	error = (*ifp->if_output)(ifp, m, gw, ro);
 
