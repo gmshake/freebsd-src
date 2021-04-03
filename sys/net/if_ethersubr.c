@@ -289,7 +289,14 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	uint32_t pflags;
 	struct llentry *lle = NULL;
 	int addref = 0;
+	int af;
 
+	af = dst->sa_family;
+#if defined(INET) && defined(INET6)
+	// XXX restore address family from inbound pkt checksum
+	if (m->m_pkthdr.csum_dat == AF_INET && af == AF_INET6)
+		af = AF_INET;
+#endif
 	phdr = NULL;
 	pflags = 0;
 	if (ro != NULL) {
@@ -352,7 +359,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, af, 0));
 	}
 	loop_copy = (pflags & RT_MAY_LOOP) != 0;
 
@@ -370,11 +377,13 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		eh = mtod(m, struct ether_header *);
 		memcpy(eh, phdr, hlen);
-		// XXX restore ether_type, for ipv4 packet with ipv6 ND resolve
-		if (m->m_pkthdr.sa_family == AF_INET && dst->sa_family == AF_INET6) {
+#if defined(INET) && defined(INET6)
+		// XXX fix ether_type, for ipv4 packet with ipv6 ND resolve
+		if (eh->ether_type == htons(ETHERTYPE_IPV6) && af == AF_INET) {
 			uint16_t etype = htons(ETHERTYPE_IP);
-			memcpy(&eh->ether_type, &etype, sizeof(eh->ether_type));
+			memcpy(&eh->ether_type, &etype, sizeof(etype));
 		}
+#endif
 	}
 
 	/*
@@ -404,7 +413,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		 */
 		if ((n = m_dup(m, M_NOWAIT)) != NULL) {
 			update_mbuf_csumflags(m, n);
-			(void)if_simloop(ifp, n, dst->sa_family, hlen);
+			(void)if_simloop(ifp, n, af, hlen);
 		} else
 			if_inc_counter(ifp, IFCOUNTER_IQDROPS, 1);
 	}

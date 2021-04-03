@@ -202,7 +202,9 @@ ip_tryforward(struct mbuf *m)
 	union {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
+#ifdef INET6
 		struct sockaddr_in6 sin6;
+#endif
 	} dst;
 	struct in_addr dest, odest, rtdest;
 	uint16_t ip_len, ip_off;
@@ -431,6 +433,7 @@ passout:
 	if (nh->nh_flags & NHF_GATEWAY) {
 		if (nh->gw_sa.sa_family == AF_INET)
 			dst.sin.sin_addr = nh->gw4_sa.sin_addr;
+#ifdef INET6
 		else { // AF_INET6
 			bzero(&dst.sin6, sizeof(struct sockaddr_in6));
 			dst.sin6.sin6_family = AF_INET6;
@@ -438,6 +441,7 @@ passout:
 			dst.sin6.sin6_addr = nh->gw6_sa.sin6_addr;
 			dst.sin6.sin6_scope_id = nh->gw6_sa.sin6_scope_id;
 		}
+#endif
 	} else
 		dst.sin.sin_addr = dest;
 
@@ -460,8 +464,11 @@ passout:
 		 * Send off the packet via outgoing interface
 		 */
 		IP_PROBE(send, NULL, NULL, ip, nh->nh_ifp, ip, NULL);
+#ifdef INET6
 		/* RFC5549 */
-		m->m_pkthdr.sa_family = AF_INET;
+		// XXX: save the af in the inbound pkt csum data
+		m->m_pkthdr.csum_data = AF_INET;
+#endif
 
 		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, &dst.sa, NULL);
 	} else {
@@ -497,8 +504,11 @@ passout:
 				IP_PROBE(send, NULL, NULL,
 				    mtod(m, struct ip *), nh->nh_ifp,
 				    mtod(m, struct ip *), NULL);
+#ifdef INET6
 				/* RFC5549 */
-				m->m_pkthdr.sa_family = AF_INET;
+				// XXX: save the af in the inbound pkt csum data
+				m->m_pkthdr.csum_data = AF_INET;
+#endif
 
 				error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
 				    &dst.sa, NULL);

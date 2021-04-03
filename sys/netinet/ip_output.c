@@ -273,9 +273,10 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 		m->m_pkthdr.csum_flags |= CSUM_SND_TAG;
 	}
 
+#ifdef INET6
 	/* RFC5549 */
-	m->m_pkthdr.sa_family = AF_INET;
-
+	m->m_pkthdr.csum_data = AF_INET;
+#endif
 	error = (*ifp->if_output)(ifp, m, gw, ro);
 
 done:
@@ -335,7 +336,9 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	struct sockaddr_in *dst;
 	union {
 		struct sockaddr_in sin;
+#ifdef INET6
 		struct sockaddr_in6 sin6;
+#endif
 	} ss;
 	const struct sockaddr *gw;
 	struct in_ifaddr *ia = NULL;
@@ -519,11 +522,14 @@ again:
 		else
 			mtu = ifp->if_mtu;
 		src = IA_SIN(ia)->sin_addr;
-		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY) { // FIXME unnumbered interface, use loopback alias address instead ???
+#ifdef INET6
+		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY && gw->sa_family == AF_INET6) {
+			// FIXME unnumbered interface, use loopback alias address or other interface address instead ???
 			IPSTAT_INC(ips_badaddr);
 			error = EADDRNOTAVAIL;
 			goto bad;
 		}
+#endif
 	} else {
 		struct nhop_object *nh;
 
@@ -559,22 +565,28 @@ again:
 				ss.sin.sin_family = AF_INET;
 				ss.sin.sin_len = sizeof(struct sockaddr_in);
 				ss.sin.sin_addr = nh->gw4_sa.sin_addr;
-			} else { // AF_INET6
+			}
+#ifdef INET6
+			else { // AF_INET6
 				bzero(&ss.sin6, sizeof(struct sockaddr_in6));
 				ss.sin6.sin6_family = AF_INET6;
 				ss.sin6.sin6_len = sizeof(struct sockaddr_in6);
 				ss.sin6.sin6_addr = nh->gw6_sa.sin6_addr;
 				ss.sin6.sin6_scope_id = nh->gw6_sa.sin6_scope_id;
 			}
+#endif
 		}
 
 		ia = ifatoia(nh->nh_ifa);
 		src = IA_SIN(ia)->sin_addr;
-		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY) { // FIXME unnumbered interface, use loopback alias address instead ???
+#ifdef INET6
+		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY && gw->sa_family == AF_INET6) {
+			// FIXME unnumbered interface, use loopback alias address or other interface address instead ???
 			IPSTAT_INC(ips_badaddr);
 			error = EADDRNOTAVAIL;
 			goto bad;
 		}
+#endif
 		isbroadcast = (((nh->nh_flags & (NHF_HOST | NHF_BROADCAST)) ==
 		    (NHF_HOST | NHF_BROADCAST)) ||
 		    ((ifp->if_flags & IFF_BROADCAST) && nh->gw_sa.sa_family == AF_INET &&
