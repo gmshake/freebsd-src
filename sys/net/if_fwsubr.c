@@ -181,7 +181,12 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 			if (error)
 				return (error == EWOULDBLOCK ? 0 : error);
 		}
-		type = ETHERTYPE_IPV6;
+#ifdef INET
+		if (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP == 0)
+			type = ETHERTYPE_IPV6;
+		else
+			type = ETHERTYPE_IP;
+#endif
 		break;
 #endif
 

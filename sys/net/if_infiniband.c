@@ -300,9 +300,17 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	bool addref;
+	int af;
 
 	NET_EPOCH_ASSERT();
 
+	af = dst->sa_family;
+#if defined(INET) && defined(INET6)
+	// RFC5549
+	// XXX restore address family
+	if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
+		af = AF_INET;
+#endif
 	addref = false;
 	phdr = NULL;
 	pflags = 0;
@@ -370,7 +378,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, af, 0));
 	}
 
 	/*
@@ -385,6 +393,11 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		ih = mtod(m, struct infiniband_header *);
 		memcpy(ih, phdr, hlen);
+#if defined(INET) && defined(INET6)
+		// XXX fix ib_protocol, for ipv4 packet with ipv6 ND resolve
+		if (ih->ib_protocol == htons(ETHERTYPE_IPV6) && af == AF_INET)
+			ih->ib_protocol = htons(ETHERTYPE_IP);
+#endif
 	}
 
 	/*
