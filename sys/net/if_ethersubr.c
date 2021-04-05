@@ -293,8 +293,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 
 	af = dst->sa_family;
 #if defined(INET) && defined(INET6)
-	// RFC5549
-	// XXX restore address family
+	/* Restore address family */
 	if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
 		af = AF_INET;
 #endif
@@ -379,8 +378,8 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		eh = mtod(m, struct ether_header *);
 		memcpy(eh, phdr, hlen);
 #if defined(INET) && defined(INET6)
-		// XXX fix ether_type, for ipv4 packet with ipv6 ND resolve
-		if (eh->ether_type == htons(ETHERTYPE_IPV6) && af == AF_INET) {
+		/* Fix ether_type, for ipv4 packet with ipv6 ND resolve */
+		if (af == AF_INET && eh->ether_type == htons(ETHERTYPE_IPV6)) {
 			uint16_t etype = htons(ETHERTYPE_IP);
 			memcpy(&eh->ether_type, &etype, sizeof(etype));
 		}

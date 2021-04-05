@@ -306,8 +306,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	af = dst->sa_family;
 #if defined(INET) && defined(INET6)
-	// RFC5549
-	// XXX restore address family
+	/* Restore address family */
 	if (af == AF_INET6 && (m->m_pkthdr.mhdr_flags & HDR_IPV4_IPV6_NHOP))
 		af = AF_INET;
 #endif
@@ -394,8 +393,8 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 		ih = mtod(m, struct infiniband_header *);
 		memcpy(ih, phdr, hlen);
 #if defined(INET) && defined(INET6)
-		// XXX fix ib_protocol, for ipv4 packet with ipv6 ND resolve
-		if (ih->ib_protocol == htons(ETHERTYPE_IPV6) && af == AF_INET)
+		/* Fix ib_protocol, for ipv4 packet with ipv6 ND resolve */
+		if (af == AF_INET && ih->ib_protocol == htons(ETHERTYPE_IPV6))
 			ih->ib_protocol = htons(ETHERTYPE_IP);
 #endif
 	}

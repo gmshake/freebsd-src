@@ -270,8 +270,7 @@ atf_init_test_cases()
 }
 
 # TODO add tests for IPv4 network with IPv6 nethop
-# TODO tests for ip_output / ip_input / ip_tryforward / ip_forward / ICMP route redirect with unnumbered interface
-# FIXME select IPv4 source address with unnumbered interface
+# TODO IPv4 source address selection with unnumbered interface (has IPv6 addresses but no IPv4 addresses)
 
 # end
 

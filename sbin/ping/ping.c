@@ -613,7 +613,7 @@ ping(int argc, char *const *argv)
 		if (bind(ssend, (struct sockaddr *)&sock_in, sizeof sock_in) ==
 		    -1)
 			err(1, "bind");
-	} // FIXME else obtain source address incase the outgoing interface is unnumbered
+	}
 
 	bzero(&whereto, sizeof(whereto));
 	to = &whereto;

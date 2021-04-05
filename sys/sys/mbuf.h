@@ -210,7 +210,7 @@ struct pkthdr {
 #define	lro_etype	PH_loc.sixteen[3] /* inbound during LRO (no reassembly) */
 /* Note PH_loc is used during IP reassembly (all 8 bytes as a ptr) */
 
-// FIXME better naming ???
+/* FIXME better naming ??? */
 #define mhdr_flags	PH_loc.sixteen[3]
 
 /*
