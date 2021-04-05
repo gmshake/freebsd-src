@@ -527,8 +527,8 @@ again:
 #ifdef INET6
 		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY && gw->sa_family == AF_INET6) {
 			// FIXME unnumbered interface, use loopback alias address or other interface address instead ???
-			IPSTAT_INC(ips_badaddr);
-			error = EADDRNOTAVAIL;
+			IPSTAT_INC(ips_badaddr); /* ips_sources_none ??? */
+			error = EADDRNOTAVAIL; /* better error ??? */
 			goto bad;
 		}
 #endif
@@ -584,8 +584,8 @@ again:
 #ifdef INET6
 		if (ip->ip_src.s_addr == INADDR_ANY && src.s_addr == INADDR_ANY && gw->sa_family == AF_INET6) {
 			// FIXME unnumbered interface, use loopback alias address or other interface address instead ???
-			IPSTAT_INC(ips_badaddr);
-			error = EADDRNOTAVAIL;
+			IPSTAT_INC(ips_badaddr); /* ips_sources_none ??? */
+			error = EADDRNOTAVAIL; /* better error ??? */
 			goto bad;
 		}
 #endif

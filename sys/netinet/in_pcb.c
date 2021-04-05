@@ -1244,6 +1244,10 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 		if (cred == NULL || !prison_flag(cred, PR_IP4)) {
 			ia = (struct in_ifaddr *)nh->nh_ifa;
 			laddr->s_addr = ia->ia_addr.sin_addr.s_addr;
+			/* Need special attention to source address selection */
+			if (ia->ia_addr.sin_addr.s_addr == INADDR_ANY) {
+				/* obtain address from other interface */
+			}
 			goto done;
 		}
 
