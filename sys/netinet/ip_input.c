@@ -736,12 +736,6 @@ passin:
 		}
 		ia = NULL;
 	}
-	/* RFC 3927 2.7: Do not forward datagrams for 169.254.0.0/16. */
-	if (IN_LINKLOCAL(ntohl(ip->ip_dst.s_addr))) {
-		IPSTAT_INC(ips_cantforward);
-		m_freem(m);
-		return;
-	}
 	if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
 		if (V_ip_mrouter) {
 			/*
@@ -778,6 +772,14 @@ passin:
 		goto ours;
 	if (ip->ip_dst.s_addr == INADDR_ANY)
 		goto ours;
+
+	/* RFC 3927 2.7: Do not forward datagrams for 169.254.0.0/16. */
+	if (IN_LINKLOCAL(ntohl(ip->ip_src.s_addr)) ||
+		IN_LINKLOCAL(ntohl(ip->ip_dst.s_addr))) {
+		IPSTAT_INC(ips_cantforward);
+		m_freem(m);
+		return;
+	}
 
 	/*
 	 * Not for us; forward if possible and desirable.
