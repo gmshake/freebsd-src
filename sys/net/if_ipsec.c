@@ -176,7 +176,7 @@ static void	ipsec_reassign(struct ifnet *, struct vnet *, char *);
 static void	ipsec_srcaddr(void *, const struct sockaddr *, int);
 static int	ipsec_ioctl(struct ifnet *, u_long, caddr_t);
 static int	ipsec_transmit(struct ifnet *, struct mbuf *);
-static int	ipsec_output(struct ifnet *, struct mbuf *,
+static int	ipsec_output(struct ifnet *, struct mbuf *, sa_family_t af,
     const struct sockaddr *, struct route *);
 static void	ipsec_qflush(struct ifnet *);
 static int	ipsec_clone_create(struct if_clone *, int, caddr_t);
@@ -441,7 +441,7 @@ ipsec_qflush(struct ifnet *ifp __unused)
 }
 
 static int
-ipsec_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+ipsec_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
 	struct route *ro)
 {
 

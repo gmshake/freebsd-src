@@ -132,7 +132,7 @@ static struct mbuf *lagg_input_infiniband(struct ifnet *, struct mbuf *);
 static void	lagg_linkstate(struct lagg_softc *);
 static void	lagg_port_state(struct ifnet *, int);
 static int	lagg_port_ioctl(struct ifnet *, u_long, caddr_t);
-static int	lagg_port_output(struct ifnet *, struct mbuf *,
+static int	lagg_port_output(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static void	lagg_port_ifdetach(void *arg __unused, struct ifnet *);
 #ifdef LAGG_PORT_STACKING
@@ -1131,7 +1131,7 @@ lagg_get_counter(struct ifnet *ifp, ift_counter cnt)
  * For direct output to child ports.
  */
 static int
-lagg_port_output(struct ifnet *ifp, struct mbuf *m,
+lagg_port_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 	const struct sockaddr *dst, struct route *ro)
 {
 	struct lagg_port *lp = ifp->if_lagg;
@@ -1140,7 +1140,7 @@ lagg_port_output(struct ifnet *ifp, struct mbuf *m,
 		case pseudo_AF_HDRCMPLT:
 		case AF_UNSPEC:
 			if (lp != NULL)
-				return ((*lp->lp_output)(ifp, m, dst, ro));
+				return ((*lp->lp_output)(ifp, m, af, dst, ro));
 	}
 
 	/* drop any other frames */

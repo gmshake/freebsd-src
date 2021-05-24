@@ -132,7 +132,7 @@ typedef struct ng_iface_private *priv_p;
 /* Interface methods */
 static void	ng_iface_start(struct ifnet *ifp);
 static int	ng_iface_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data);
-static int	ng_iface_output(struct ifnet *ifp, struct mbuf *m0,
+static int	ng_iface_output(struct ifnet *ifp, struct mbuf *m0, sa_family_t af,
     			const struct sockaddr *dst, struct route *ro);
 static void	ng_iface_bpftap(struct ifnet *ifp,
 			struct mbuf *m, sa_family_t family);
@@ -346,10 +346,9 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
  */
 
 static int
-ng_iface_output(struct ifnet *ifp, struct mbuf *m,
+ng_iface_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 	const struct sockaddr *dst, struct route *ro)
 {
-	uint32_t af;
 	int error;
 
 	/* Check interface flags */
@@ -370,8 +369,6 @@ ng_iface_output(struct ifnet *ifp, struct mbuf *m,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 
 	/* Berkeley packet filter */
 	ng_iface_bpftap(ifp, m, af);

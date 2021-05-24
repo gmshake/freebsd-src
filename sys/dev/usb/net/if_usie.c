@@ -129,7 +129,7 @@ static void usie_if_sync_cb(void *, int);
 static void usie_if_status_cb(void *, int);
 
 static void usie_if_start(struct ifnet *);
-static int usie_if_output(struct ifnet *, struct mbuf *,
+static int usie_if_output(struct ifnet *, struct mbuf *, sa_family_t af,
 	const struct sockaddr *, struct route *);
 static void usie_if_init(void *);
 static void usie_if_stop(struct usie_softc *);
@@ -1191,14 +1191,14 @@ usie_if_start(struct ifnet *ifp)
 }
 
 static int
-usie_if_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+usie_if_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	int err;
 
-	DPRINTF("proto=%x\n", dst->sa_family);
+	DPRINTF("proto=%x\n", af);
 
-	switch (dst->sa_family) {
+	switch (af) {
 #ifdef INET6
 	case AF_INET6;
 	/* fall though */

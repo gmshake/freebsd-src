@@ -119,7 +119,7 @@ static void	me_reassign(struct ifnet *, struct vnet *, char *);
 static void	me_qflush(struct ifnet *);
 static int	me_transmit(struct ifnet *, struct mbuf *);
 static int	me_ioctl(struct ifnet *, u_long, caddr_t);
-static int	me_output(struct ifnet *, struct mbuf *,
+static int	me_output(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static int	me_input(struct mbuf *, int, int, void *);
 
@@ -532,15 +532,11 @@ drop:
 }
 
 static int
-me_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+me_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
    struct route *ro __unused)
 {
-	uint32_t af;
-
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 	m->m_pkthdr.csum_data = af;
 	return (ifp->if_transmit(ifp, m));
 }

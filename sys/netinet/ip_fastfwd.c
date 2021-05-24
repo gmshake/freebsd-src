@@ -448,7 +448,7 @@ passout:
 		 * Send off the packet via outgoing interface
 		 */
 		IP_PROBE(send, NULL, NULL, ip, nh->nh_ifp, ip, NULL);
-		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
+		error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, AF_INET,
 		    (struct sockaddr *)&dst, NULL);
 	} else {
 		/*
@@ -483,7 +483,7 @@ passout:
 				IP_PROBE(send, NULL, NULL,
 				    mtod(m, struct ip *), nh->nh_ifp,
 				    mtod(m, struct ip *), NULL);
-				error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
+				error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, AF_INET,
 				    (struct sockaddr *)&dst, NULL);
 				if (error)
 					break;

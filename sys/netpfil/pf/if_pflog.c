@@ -86,7 +86,7 @@ __FBSDID("$FreeBSD$");
 #define DPRINTF(x)
 #endif
 
-static int	pflogoutput(struct ifnet *, struct mbuf *,
+static int	pflogoutput(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static void	pflogattach(int);
 static int	pflogioctl(struct ifnet *, u_long, caddr_t);
@@ -175,7 +175,7 @@ pflogstart(struct ifnet *ifp)
 }
 
 static int
-pflogoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+pflogoutput(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
 	struct route *rt)
 {
 	m_freem(m);

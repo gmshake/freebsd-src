@@ -91,7 +91,7 @@
 				    CSUM_SCTP_VALID)
 
 int		loioctl(struct ifnet *, u_long, caddr_t);
-int		looutput(struct ifnet *ifp, struct mbuf *m,
+int		looutput(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 		    const struct sockaddr *dst, struct route *ro);
 static int	lo_clone_create(struct if_clone *, int, caddr_t);
 static void	lo_clone_destroy(struct ifnet *);
@@ -201,10 +201,9 @@ static moduledata_t loop_mod = {
 DECLARE_MODULE(if_lo, loop_mod, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY);
 
 int
-looutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+looutput(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
-	u_int32_t af;
 #ifdef MAC
 	int error;
 #endif
@@ -234,8 +233,6 @@ looutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC || dst->sa_family == pseudo_AF_HDRCMPLT)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 
 #if 1	/* XXX */
 	switch (af) {

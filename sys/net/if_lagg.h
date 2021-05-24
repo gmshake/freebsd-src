@@ -280,7 +280,7 @@ struct lagg_port {
 
 	/* Redirected callbacks */
 	int	(*lp_ioctl)(struct ifnet *, u_long, caddr_t);
-	int	(*lp_output)(struct ifnet *, struct mbuf *,
+	int	(*lp_output)(struct ifnet *, struct mbuf *, sa_family_t af,
 		     const struct sockaddr *, struct route *);
 	struct lagg_counters		port_counters;	/* ifp counters copy */
 

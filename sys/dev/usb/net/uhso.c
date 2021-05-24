@@ -473,7 +473,7 @@ static void uhso_if_init(void *);
 static void uhso_if_start(struct ifnet *);
 static void uhso_if_stop(struct uhso_softc *);
 static int  uhso_if_ioctl(struct ifnet *, u_long, caddr_t);
-static int  uhso_if_output(struct ifnet *, struct mbuf *,
+static int  uhso_if_output(struct ifnet *, struct mbuf *, sa_family_t af,
     const struct sockaddr *, struct route *);
 static void uhso_if_rxflush(void *);
 
@@ -1886,15 +1886,15 @@ uhso_if_init(void *priv)
 }
 
 static int
-uhso_if_output(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
+uhso_if_output(struct ifnet *ifp, struct mbuf *m0, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	int error;
 
 	/* Only IPv4/6 support */
-	if (dst->sa_family != AF_INET
+	if (af != AF_INET
 #ifdef INET6
-	   && dst->sa_family != AF_INET6
+	   && af != AF_INET6
 #endif
 	 ) {
 		return (EAFNOSUPPORT);

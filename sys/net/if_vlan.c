@@ -305,7 +305,7 @@ static	int vlan_setflag(struct ifnet *ifp, int flag, int status,
 static	int vlan_setflags(struct ifnet *ifp, int status);
 static	int vlan_setmulti(struct ifnet *ifp);
 static	int vlan_transmit(struct ifnet *ifp, struct mbuf *m);
-static	int vlan_output(struct ifnet *ifp, struct mbuf *m,
+static	int vlan_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
     const struct sockaddr *dst, struct route *ro);
 static	void vlan_unconfig(struct ifnet *ifp);
 static	void vlan_unconfig_locked(struct ifnet *ifp, int departing);
@@ -1244,7 +1244,7 @@ vlan_transmit(struct ifnet *ifp, struct mbuf *m)
 }
 
 static int
-vlan_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+vlan_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	struct ifvlan *ifv;
@@ -1265,7 +1265,7 @@ vlan_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		ifv = p->if_softc;
 	} while (p->if_type == IFT_L2VLAN);
 
-	return p->if_output(ifp, m, dst, ro);
+	return p->if_output(ifp, m, af, dst, ro);
 }
 
 /*

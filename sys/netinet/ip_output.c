@@ -273,7 +273,7 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 		m->m_pkthdr.csum_flags |= CSUM_SND_TAG;
 	}
 
-	error = (*ifp->if_output)(ifp, m, (const struct sockaddr *)gw, ro);
+	error = (*ifp->if_output)(ifp, m, AF_INET, (const struct sockaddr *)gw, ro);
 
 done:
 	/* Check for route change invalidating send tags. */

@@ -93,7 +93,7 @@ VNET_DEFINE_STATIC(struct if_clone *, enc_cloner);
 #define	V_enc_cloner	VNET(enc_cloner)
 
 static int	enc_ioctl(struct ifnet *, u_long, caddr_t);
-static int	enc_output(struct ifnet *, struct mbuf *,
+static int	enc_output(struct ifnet *, struct mbuf *, sa_family_t af,
     const struct sockaddr *, struct route *);
 static int	enc_clone_create(struct if_clone *, int, caddr_t);
 static void	enc_clone_destroy(struct ifnet *);
@@ -185,7 +185,7 @@ enc_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 }
 
 static int
-enc_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+enc_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 

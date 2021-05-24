@@ -75,21 +75,21 @@ __FBSDID("$FreeBSD$");
 #include "ip_fw_nat64.h"
 #include "nat64_translate.h"
 
-typedef int (*nat64_output_t)(struct ifnet *, struct mbuf *,
+typedef int (*nat64_output_t)(struct ifnet *, struct mbuf *, sa_family_t af,
     struct sockaddr *, struct nat64_counters *, void *);
-typedef int (*nat64_output_one_t)(struct mbuf *, struct nat64_counters *,
-    void *);
+typedef int (*nat64_output_one_t)(struct mbuf *,
+    struct nat64_counters *, void *);
 
 static struct nhop_object *nat64_find_route4(struct sockaddr_in *,
     struct mbuf *);
 static struct nhop_object *nat64_find_route6(struct sockaddr_in6 *,
     struct mbuf *);
 static int nat64_output_one(struct mbuf *, struct nat64_counters *, void *);
-static int nat64_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+static int nat64_output(struct ifnet *, struct mbuf *, sa_family_t af, struct sockaddr *,
     struct nat64_counters *, void *);
 static int nat64_direct_output_one(struct mbuf *, struct nat64_counters *,
     void *);
-static int nat64_direct_output(struct ifnet *, struct mbuf *,
+static int nat64_direct_output(struct ifnet *, struct mbuf *, sa_family_t af,
     struct sockaddr *, struct nat64_counters *, void *);
 
 struct nat64_methods {
@@ -156,14 +156,14 @@ nat64_log(struct pfloghdr *logdata, struct mbuf *m, sa_family_t family)
 }
 
 static int
-nat64_direct_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+nat64_direct_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, struct sockaddr *dst,
     struct nat64_counters *stats, void *logdata)
 {
 	int error;
 
 	if (logdata != NULL)
 		nat64_log(logdata, m, dst->sa_family);
-	error = (*ifp->if_output)(ifp, m, dst, NULL);
+	error = (*ifp->if_output)(ifp, m, af, dst, NULL);
 	if (error != 0)
 		NAT64STAT_INC(stats, oerrors);
 	return (error);
@@ -221,27 +221,23 @@ nat64_direct_output_one(struct mbuf *m, struct nat64_counters *stats,
 	}
 	if (logdata != NULL)
 		nat64_log(logdata, m, dst->sa_family);
-	error = (*ifp->if_output)(ifp, m, dst, NULL);
+	error = (*ifp->if_output)(ifp, m, dst->sa_family, dst, NULL);
 	if (error != 0)
 		NAT64STAT_INC(stats, oerrors);
 	return (error);
 }
 
 static int
-nat64_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+nat64_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, struct sockaddr *dst,
     struct nat64_counters *stats, void *logdata)
 {
-	struct ip *ip4;
-	int ret, af;
+	int ret;
 
-	ip4 = mtod(m, struct ip *);
-	switch (ip4->ip_v) {
-	case IPVERSION:
-		af = AF_INET;
+	switch (af) {
+	case AF_INET:
 		ret = NETISR_IP;
 		break;
-	case (IPV6_VERSION >> 4):
-		af = AF_INET6;
+	case AF_INET6:
 		ret = NETISR_IPV6;
 		break;
 	default:
@@ -263,8 +259,25 @@ nat64_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 static int
 nat64_output_one(struct mbuf *m, struct nat64_counters *stats, void *logdata)
 {
+	sa_family_t af;
+	struct ip *ip4;
 
-	return (nat64_output(NULL, m, NULL, stats, logdata));
+	ip4 = mtod(m, struct ip *);
+	switch (ip4->ip_v) {
+	case IPVERSION:
+		af = AF_INET;
+		break;
+	case (IPV6_VERSION >> 4):
+		af = AF_INET6;
+		break;
+	default:
+		m_freem(m);
+		NAT64STAT_INC(stats, dropped);
+		DPRINTF(DP_DROPS, "unknown IP version");
+		return (EAFNOSUPPORT);
+	}
+
+	return (nat64_output(NULL, m, af, NULL, stats, logdata));
 }
 
 /*
@@ -1334,7 +1347,7 @@ nat64_do_handle_ip4(struct mbuf *m, struct in6_addr *saddr,
 	mbufq_init(&mq, 255);
 	nat64_fragment6(&cfg->stats, &ip6, &mq, m, nh->nh_mtu, ip_id, ip_off);
 	while ((m = mbufq_dequeue(&mq)) != NULL) {
-		if (V_nat64out->output(nh->nh_ifp, m, (struct sockaddr *)&dst,
+		if (V_nat64out->output(nh->nh_ifp, m, AF_INET6, (struct sockaddr *)&dst,
 		    &cfg->stats, logdata) != 0)
 			break;
 		NAT64STAT_INC(&cfg->stats, opcnt46);
@@ -1729,7 +1742,7 @@ nat64_do_handle_ip6(struct mbuf *m, uint32_t aaddr, uint16_t aport,
 
 	m_adj(m, hlen - sizeof(ip));
 	bcopy(&ip, mtod(m, void *), sizeof(ip));
-	if (V_nat64out->output(nh->nh_ifp, m, (struct sockaddr *)&dst,
+	if (V_nat64out->output(nh->nh_ifp, m, AF_INET, (struct sockaddr *)&dst,
 	    &cfg->stats, logdata) == 0)
 		NAT64STAT_INC(&cfg->stats, opcnt64);
 	return (NAT64RETURN);

@@ -822,7 +822,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	if (ntohs(ip->ip_len) <= ifp->if_mtu) {
 		if (!ip->ip_sum)
 			ip->ip_sum = in_cksum(m, hlen);
-		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)&dst,
+		error = (*ifp->if_output)(ifp, m, AF_INET, (struct sockaddr *)&dst,
 			    NULL
 			);
 		goto done;
@@ -904,7 +904,7 @@ sendorfree:
 		m0 = m->m_act;
 		m->m_act = 0;
 		if (error == 0)
-			error = (*ifp->if_output)(ifp, m,
+			error = (*ifp->if_output)(ifp, m, AF_INET,
 			    (struct sockaddr *)&dst,
 			    NULL
 			    );

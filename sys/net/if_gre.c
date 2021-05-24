@@ -113,7 +113,7 @@ static void	gre_reassign(struct ifnet *, struct vnet *, char *);
 static void	gre_qflush(struct ifnet *);
 static int	gre_transmit(struct ifnet *, struct mbuf *);
 static int	gre_ioctl(struct ifnet *, u_long, caddr_t);
-static int	gre_output(struct ifnet *, struct mbuf *,
+static int	gre_output(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static void	gre_delete_tunnel(struct gre_softc *);
 
@@ -605,15 +605,11 @@ drop:
 }
 
 static int
-gre_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+gre_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
    struct route *ro)
 {
-	uint32_t af;
-
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 	/*
 	 * Now save the af in the inbound pkt csum data, this is a cheat since
 	 * we are using the inbound csum_data field to carry the af over to

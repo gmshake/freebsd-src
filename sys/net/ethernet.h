@@ -424,6 +424,7 @@ struct ether_vlan_header {
 #ifdef _KERNEL
 
 #include <sys/_eventhandler.h>
+#include <sys/socket.h>
 
 struct ifnet;
 struct mbuf;
@@ -442,7 +443,7 @@ struct vnet;
 extern	void ether_reassign(struct ifnet *, struct vnet *, char *);
 #endif
 extern	int  ether_ioctl(struct ifnet *, u_long, caddr_t);
-extern	int  ether_output(struct ifnet *, struct mbuf *,
+extern	int  ether_output(struct ifnet *, struct mbuf *, sa_family_t af,
 	    const struct sockaddr *, struct route *);
 extern	int  ether_output_frame(struct ifnet *, struct mbuf *);
 extern	char *ether_sprintf(const u_int8_t *);

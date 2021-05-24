@@ -196,7 +196,7 @@ static void	bpf_attachd(struct bpf_d *, struct bpf_if *);
 static void	bpf_detachd(struct bpf_d *);
 static void	bpf_detachd_locked(struct bpf_d *, bool);
 static void	bpfd_free(epoch_context_t);
-static int	bpf_movein(struct uio *, int, struct ifnet *, struct mbuf **,
+static int	bpf_movein(struct uio *, int, struct ifnet *, struct mbuf **, sa_family_t *,
 		    struct sockaddr *, int *, struct bpf_d *);
 static int	bpf_setif(struct bpf_d *, struct ifreq *);
 static void	bpf_timed_out(void *);
@@ -556,7 +556,7 @@ bpf_ioctl_setzbuf(struct thread *td, struct bpf_d *d, struct bpf_zbuf *bz)
  * General BPF functions.
  */
 static int
-bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
+bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp, sa_family_t *afp,
     struct sockaddr *sockp, int *hdrlen, struct bpf_d *d)
 {
 	const struct ieee80211_bpf_params *p;
@@ -578,22 +578,26 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 	 */
 	switch (linktype) {
 	case DLT_SLIP:
+		*afp = AF_INET;
 		sockp->sa_family = AF_INET;
 		hlen = 0;
 		break;
 
 	case DLT_EN10MB:
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_UNSPEC;
 		/* XXX Would MAXLINKHDR be better? */
 		hlen = ETHER_HDR_LEN;
 		break;
 
 	case DLT_FDDI:
+		*afp = AF_IMPLINK;
 		sockp->sa_family = AF_IMPLINK;
 		hlen = 0;
 		break;
 
 	case DLT_RAW:
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_UNSPEC;
 		hlen = 0;
 		break;
@@ -603,6 +607,7 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 		 * null interface types require a 4 byte pseudo header which
 		 * corresponds to the address family of the packet.
 		 */
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_UNSPEC;
 		hlen = 4;
 		break;
@@ -613,21 +618,25 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 		 * though it isn't standard, vpi:vci needs to be
 		 * specified anyway.
 		 */
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_UNSPEC;
 		hlen = 12;	/* XXX 4(ATM_PH) + 3(LLC) + 5(SNAP) */
 		break;
 
 	case DLT_PPP:
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_UNSPEC;
 		hlen = 4;	/* This should match PPP_HDRLEN */
 		break;
 
 	case DLT_IEEE802_11:		/* IEEE 802.11 wireless */
+		*afp = AF_IEEE80211;
 		sockp->sa_family = AF_IEEE80211;
 		hlen = 0;
 		break;
 
 	case DLT_IEEE802_11_RADIO:	/* IEEE 802.11 wireless w/ phy params */
+		*afp = AF_UNSPEC;
 		sockp->sa_family = AF_IEEE80211;
 		sockp->sa_len = 12;	/* XXX != 0 */
 		hlen = sizeof(struct ieee80211_bpf_params);
@@ -1170,6 +1179,7 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	struct ifnet *ifp;
 	struct mbuf *m, *mc;
 	int error, hlen;
+	sa_family_t af;
 
 	error = devfs_get_cdevpriv((void **)&d);
 	if (error != 0)
@@ -1206,7 +1216,7 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	BPFD_UNLOCK(d);
 
 	error = bpf_movein(uio, (int)bp->bif_dlt, ifp,
-	    &m, &dst, &hlen, d);
+	    &m, &af, &dst, &hlen, d);
 
 	if (error != 0) {
 		counter_u64_add(d->bd_wdcount, 1);
@@ -1262,7 +1272,7 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	/* Avoid possible recursion on BPFD_LOCK(). */
 	NET_EPOCH_ENTER(et);
 	BPFD_UNLOCK(d);
-	error = (*ifp->if_output)(ifp, m, &dst, &ro);
+	error = (*ifp->if_output)(ifp, m, af, &dst, &ro);
 	if (error)
 		counter_u64_add(d->bd_wdcount, 1);
 

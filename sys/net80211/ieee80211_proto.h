@@ -94,7 +94,7 @@ int	ieee80211_mgmt_output(struct ieee80211_node *, struct mbuf *, int,
 		struct ieee80211_bpf_params *);
 int	ieee80211_raw_xmit(struct ieee80211_node *, struct mbuf *,
 		const struct ieee80211_bpf_params *);
-int	ieee80211_output(struct ifnet *, struct mbuf *,
+int	ieee80211_output(struct ifnet *, struct mbuf *, sa_family_t af,
                const struct sockaddr *, struct route *ro);
 int	ieee80211_vap_pkt_send_dest(struct ieee80211vap *, struct mbuf *,
 		struct ieee80211_node *);

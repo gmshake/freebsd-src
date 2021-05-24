@@ -478,7 +478,7 @@ ng_gif_rcv_lower(node_p node, struct mbuf *m)
 	 * fourth argument (rt) to in{,6}_gif_output which ignore it.
 	 * If this changes ng_gif will probably break.
 	 */
-	return gif_output(priv->ifp, m, &dst, NULL);
+	return gif_output(priv->ifp, m, dst.sa_family, &dst, NULL);
 }
 
 /*

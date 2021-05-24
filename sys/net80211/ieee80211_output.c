@@ -737,7 +737,7 @@ ieee80211_sanitize_rates(struct ieee80211_node *ni, struct mbuf *m,
  * raw 802.11 frames.
  */
 int
-ieee80211_output(struct ifnet *ifp, struct mbuf *m,
+ieee80211_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 	const struct sockaddr *dst, struct route *ro)
 {
 #define senderr(e) do { error = (e); goto bad;} while (0)
@@ -767,7 +767,7 @@ ieee80211_output(struct ifnet *ifp, struct mbuf *m,
 	 * a raw 802.11 frame.
 	 */
 	if (dst->sa_family != AF_IEEE80211)
-		return vap->iv_output(ifp, m, dst, ro);
+		return vap->iv_output(ifp, m, af, dst, ro);
 #ifdef MAC
 	error = mac_ifnet_check_transmit(ifp, m);
 	if (error)

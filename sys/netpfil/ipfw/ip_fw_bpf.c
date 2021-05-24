@@ -67,7 +67,7 @@ ipfw_bpf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t addr)
 }
 
 static int
-ipfw_bpf_output(struct ifnet *ifp, struct mbuf *m,
+ipfw_bpf_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 	const struct sockaddr *dst, struct route *ro)
 {
 

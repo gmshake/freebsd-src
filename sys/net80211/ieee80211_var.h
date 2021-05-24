@@ -566,7 +566,7 @@ struct ieee80211vap {
 	int			(*iv_newstate)(struct ieee80211vap *,
 				    enum ieee80211_state, int);
 	/* 802.3 output method for raw frame xmit */
-	int			(*iv_output)(struct ifnet *, struct mbuf *,
+	int			(*iv_output)(struct ifnet *, struct mbuf *, sa_family_t,
 				    const struct sockaddr *, struct route *);
 
 	int			(*iv_wme_update)(struct ieee80211vap *,

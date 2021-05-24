@@ -5609,7 +5609,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 			m0->m_pkthdr.csum_flags &= ~CSUM_IP;
 		}
 		m_clrprotoflags(m0);	/* Avoid confusing lower layers. */
-		error = (*ifp->if_output)(ifp, m0, sintosa(&dst), NULL);
+		error = (*ifp->if_output)(ifp, m0, AF_INET, sintosa(&dst), NULL);
 		goto done;
 	}
 
@@ -5634,7 +5634,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 		m0->m_nextpkt = NULL;
 		if (error == 0) {
 			m_clrprotoflags(m0);
-			error = (*ifp->if_output)(ifp, m0, sintosa(&dst), NULL);
+			error = (*ifp->if_output)(ifp, m0, AF_INET, sintosa(&dst), NULL);
 		} else
 			m_freem(m0);
 	}

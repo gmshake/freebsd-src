@@ -287,7 +287,7 @@ static int	pfsync_clone_create(struct if_clone *, int, caddr_t);
 static void	pfsync_clone_destroy(struct ifnet *);
 static int	pfsync_alloc_scrub_memory(struct pfsync_state_peer *,
 		    struct pf_state_peer *);
-static int	pfsyncoutput(struct ifnet *, struct mbuf *,
+static int	pfsyncoutput(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static int	pfsyncioctl(struct ifnet *, u_long, caddr_t);
 
@@ -1319,7 +1319,7 @@ pfsync_in_error(struct pfsync_pkt *pkt, struct mbuf *m, int offset, int count)
 }
 
 static int
-pfsyncoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+pfsyncoutput(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
 	struct route *rt)
 {
 	m_freem(m);

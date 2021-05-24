@@ -259,7 +259,7 @@ static const u_short interactive_ports[8] = {
 	struct ifnet *ifp = SP2IFP(sp);				\
 	int debug = ifp->if_flags & IFF_DEBUG
 
-static int sppp_output(struct ifnet *ifp, struct mbuf *m,
+static int sppp_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
 	const struct sockaddr *dst, struct route *ro);
 
 static void sppp_cisco_send(struct sppp *sp, int type, long par1, long par2);
@@ -769,7 +769,7 @@ sppp_ifstart(struct ifnet *ifp)
  * Enqueue transmit packet.
  */
 static int
-sppp_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+sppp_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
 	struct route *ro)
 {
 	struct sppp *sp = IFP2SP(ifp);
@@ -805,7 +805,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		 * dialout event in case IPv6 has been
 		 * administratively disabled on that interface.
 		 */
-		if (dst->sa_family == AF_INET6 &&
+		if (af == AF_INET6 &&
 		    !(sp->confflags & CONF_ENABLE_IPV6))
 			goto drop;
 #endif
@@ -818,7 +818,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	}
 
 #ifdef INET
-	if (dst->sa_family == AF_INET) {
+	if (af == AF_INET) {
 		/* XXX Check mbuf length here? */
 		struct ip *ip = mtod (m, struct ip*);
 		struct tcphdr *tcp = (struct tcphdr*) ((long*)ip + ip->ip_hl);
@@ -888,7 +888,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #endif
 
 #ifdef INET6
-	if (dst->sa_family == AF_INET6) {
+	if (af == AF_INET6) {
 		/* XXX do something tricky here? */
 	}
 #endif
@@ -926,7 +926,7 @@ nobufs:		if (debug)
 		h->control = PPP_UI;                 /* Unnumbered Info */
 	}
 
-	switch (dst->sa_family) {
+	switch (af) {
 #ifdef INET
 	case AF_INET:   /* Internet Protocol */
 		if (sp->pp_mode == IFF_CISCO)

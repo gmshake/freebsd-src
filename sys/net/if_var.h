@@ -43,9 +43,10 @@
  * length, and provides higher level routines with input datagrams
  * received from its medium.
  *
- * Output occurs when the routine if_output is called, with three parameters:
- *	(*ifp->if_output)(ifp, m, dst, ro)
+ * Output occurs when the routine if_output is called, with four parameters:
+ *	(*ifp->if_output)(ifp, m, af, dst, ro)
  * Here m is the mbuf chain to be sent and dst is the destination address.
+ * af is the address family of source address.
  * The output routine encapsulates the supplied datagram if necessary,
  * and then transmits it on its medium.
  *
@@ -368,8 +369,8 @@ struct ifnet {
 
 	/* Various procedures of the layer2 encapsulation and drivers. */
 	int	(*if_output)		/* output routine (enqueue) */
-		(struct ifnet *, struct mbuf *, const struct sockaddr *,
-		     struct route *);
+		(struct ifnet *, struct mbuf *, sa_family_t af,
+		     const struct sockaddr *, struct route *);
 	void	(*if_input)		/* input routine (from h/w driver) */
 		(struct ifnet *, struct mbuf *);
 	struct mbuf *(*if_bridge_input)(struct ifnet *, struct mbuf *);

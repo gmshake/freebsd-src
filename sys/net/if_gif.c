@@ -401,15 +401,11 @@ gif_qflush(struct ifnet *ifp __unused)
 }
 
 int
-gif_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+gif_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
 	struct route *ro)
 {
-	uint32_t af;
-
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 	/*
 	 * Now save the af in the inbound pkt csum data, this is a cheat since
 	 * we are using the inbound csum_data field to carry the af over to

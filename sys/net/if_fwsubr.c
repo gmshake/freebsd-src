@@ -78,7 +78,7 @@ struct fw_hwaddr firewire_broadcastaddr = {
 };
 
 static int
-firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+firewire_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	struct fw_com *fc = IFP2FWC(ifp);
@@ -201,6 +201,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		else
 			bcopy(&firewire_broadcastaddr, h.firewire_dhost, 8);
 		bcopy(&fc->fc_hwaddr, h.firewire_shost, 8);
+		// FIXME type
 		h.firewire_type = htons(type);
 		bpf_mtap2(ifp->if_bpf, &h, sizeof(h), m);
 	}
@@ -243,6 +244,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 			goto bad;
 		}
 		enc = mtod(m, union fw_encap *);
+		// FIXME type
 		enc->unfrag.ether_type = type;
 		enc->unfrag.lf = FW_ENCAP_UNFRAG;
 		enc->unfrag.reserved = 0;

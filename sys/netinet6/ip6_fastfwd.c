@@ -282,7 +282,7 @@ passout:
 
 	if (nh->nh_flags & NHF_GATEWAY)
 		dst.sin6_addr = nh->gw6_sa.sin6_addr;
-	error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m,
+	error = (*nh->nh_ifp->if_output)(nh->nh_ifp, m, AF_INET6,
 	    (struct sockaddr *)&dst, NULL);
 	if (error != 0) {
 		in6_ifstat_inc(nh->nh_ifp, ifs6_out_discard);

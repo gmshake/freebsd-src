@@ -158,7 +158,7 @@ static char *stfnames[] = {"stf0", "stf", "6to4", NULL};
 static int stfmodevent(module_t, int, void *);
 static int stf_encapcheck(const struct mbuf *, int, int, void *);
 static int stf_getsrcifa6(struct ifnet *, struct in6_addr *, struct in6_addr *);
-static int stf_output(struct ifnet *, struct mbuf *, const struct sockaddr *,
+static int stf_output(struct ifnet *, struct mbuf *, sa_family_t af, const struct sockaddr *,
 	struct route *);
 static int isrfc1918addr(struct in_addr *);
 static int stf_checkaddr4(struct stf_softc *, struct in_addr *,
@@ -405,7 +405,7 @@ stf_getsrcifa6(struct ifnet *ifp, struct in6_addr *addr, struct in6_addr *mask)
 }
 
 static int
-stf_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+stf_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	struct stf_softc *sc;
@@ -481,8 +481,8 @@ stf_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		 * will only read from the mbuf (i.e., it won't
 		 * try to free it or keep a pointer a to it).
 		 */
-		u_int af = AF_INET6;
-		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m);
+		u_int baf = AF_INET6;
+		bpf_mtap2(ifp->if_bpf, &baf, sizeof(af), m);
 	}
 
 	M_PREPEND(m, sizeof(struct ip), M_NOWAIT);

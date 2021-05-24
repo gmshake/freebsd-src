@@ -289,7 +289,7 @@ infiniband_resolve_addr(struct ifnet *ifp, struct mbuf *m,
  * Infiniband output routine.
  */
 static int
-infiniband_output(struct ifnet *ifp, struct mbuf *m,
+infiniband_output(struct ifnet *ifp, struct mbuf *m, sa_family_t af,
     const struct sockaddr *dst, struct route *ro)
 {
 	uint8_t linkhdr[INFINIBAND_HDR_LEN];
@@ -370,7 +370,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, af, 0));
 	}
 
 	/*
@@ -385,6 +385,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		ih = mtod(m, struct infiniband_header *);
 		memcpy(ih, phdr, hlen);
+		// FIXME fix phdr
 	}
 
 	/*

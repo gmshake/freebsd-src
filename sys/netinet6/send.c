@@ -202,7 +202,7 @@ send_output(struct mbuf *m, struct ifnet *ifp, int direction)
 		 * XXX-BZ as we added data, what about fragmenting,
 		 * if now needed?
 		 */
-		error = ((*ifp->if_output)(ifp, m, (struct sockaddr *)&dst,
+		error = ((*ifp->if_output)(ifp, m, AF_INET6, (struct sockaddr *)&dst,
 		    NULL));
 		if (error)
 			error = ENOENT;

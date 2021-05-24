@@ -1600,7 +1600,7 @@ phyint_send(struct ip6_hdr *ip6, struct mif6 *mifp, struct mbuf *m)
 		 * we need no ND for a multicast forwarded packet...right?
 		 */
 		m_clrprotoflags(m);	/* Avoid confusing lower layers. */
-		error = (*ifp->if_output)(ifp, mb_copy,
+		error = (*ifp->if_output)(ifp, mb_copy, AF_INET6,
 		    (struct sockaddr *)&dst6, NULL);
 		MRT6_DLOG(DEBUG_XMIT, "mif %u err %d",
 		    (uint16_t)(mifp - mif6table), error);

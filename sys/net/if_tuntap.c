@@ -227,7 +227,7 @@ static int	tunifioctl(struct ifnet *, u_long, caddr_t);
 static void	tuninit(struct ifnet *);
 static void	tunifinit(void *xtp);
 static int	tuntapmodevent(module_t, int, void *);
-static int	tunoutput(struct ifnet *, struct mbuf *,
+static int	tunoutput(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *ro);
 static void	tunstart(struct ifnet *);
 static void	tunstart_l2(struct ifnet *);
@@ -1365,13 +1365,12 @@ bad:
  * tunoutput - queue packets from higher level ready to put out.
  */
 static int
-tunoutput(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
+tunoutput(struct ifnet *ifp, struct mbuf *m0, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
 	struct tuntap_softc *tp = ifp->if_softc;
 	u_short cached_tun_flags;
 	int error;
-	u_int32_t af;
 
 	TUNDEBUG (ifp, "tunoutput\n");
 
@@ -1401,8 +1400,6 @@ tunoutput(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 
 	if (bpf_peers_present(ifp->if_bpf))
 		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m0);

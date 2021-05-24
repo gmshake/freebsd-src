@@ -67,7 +67,7 @@ struct disc_softc {
 	struct ifnet *sc_ifp;
 };
 
-static int	discoutput(struct ifnet *, struct mbuf *,
+static int	discoutput(struct ifnet *, struct mbuf *, sa_family_t af,
 		    const struct sockaddr *, struct route *);
 static int	discioctl(struct ifnet *, u_long, caddr_t);
 static int	disc_clone_create(struct if_clone *, int, caddr_t);
@@ -174,18 +174,14 @@ static moduledata_t disc_mod = {
 DECLARE_MODULE(if_disc, disc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 
 static int
-discoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+discoutput(struct ifnet *ifp, struct mbuf *m, sa_family_t af, const struct sockaddr *dst,
     struct route *ro)
 {
-	u_int32_t af;
-
 	M_ASSERTPKTHDR(m);
 
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else
-		af = dst->sa_family;
 
 	if (bpf_peers_present(ifp->if_bpf))
 		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m);

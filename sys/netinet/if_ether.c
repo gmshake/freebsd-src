@@ -440,7 +440,7 @@ arprequest_internal(struct ifnet *ifp, const struct in_addr *sip,
 
 	m->m_flags |= M_BCAST;
 	m_clrprotoflags(m);	/* Avoid confusing lower layers. */
-	error = (*ifp->if_output)(ifp, m, &sa, &ro);
+	error = (*ifp->if_output)(ifp, m, AF_ARP, &sa, &ro);
 	ARPSTAT_INC(txrequests);
 	if (error) {
 		ARPSTAT_INC(txerrors);
@@ -1147,7 +1147,7 @@ reply:
 	ro.ro_flags = 0;
 
 	m_clrprotoflags(m);	/* Avoid confusing lower layers. */
-	(*ifp->if_output)(ifp, m, &sa, &ro);
+	(*ifp->if_output)(ifp, m, AF_ARP, &sa, &ro);
 	ARPSTAT_INC(txreplies);
 	return;
 
@@ -1248,7 +1248,7 @@ arp_check_update_lle(struct arphdr *ah, struct in_addr isaddr, struct ifnet *ifp
 			m_hold->m_nextpkt = NULL;
 			/* Avoid confusing lower layers. */
 			m_clrprotoflags(m_hold);
-			(*ifp->if_output)(ifp, m_hold, &sa, NULL);
+			(*ifp->if_output)(ifp, m_hold, AF_ARP, &sa, NULL);
 		}
 	} else
 		LLE_WUNLOCK(la);
