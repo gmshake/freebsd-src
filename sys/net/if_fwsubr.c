@@ -94,6 +94,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #if defined(INET) || defined(INET6)
 	int is_gw = 0;
 #endif
+	int af = dst->sa_family;
 
 #ifdef MAC
 	error = mac_ifnet_check_transmit(ifp, m);
@@ -110,6 +111,8 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #if defined(INET) || defined(INET6)
 	if (ro != NULL)
 		is_gw = (ro->ro_flags & RT_HAS_GW) != 0;
+	if (is_gw)
+		af = ro->ro_dst.sa_family;
 #endif
 	/*
 	 * For unicast, we make a tag to store the lladdr of the
@@ -137,6 +140,26 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		destfw = NULL;
 	}
 
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		type = ETHERTYPE_IP;
+		break;
+	case AF_ARP:
+		type = ETHERTYPE_ARP;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		type = ETHERTYPE_IPV6;
+		break;
+#endif
+	default:
+		if_printf(ifp, "can't handle af%d\n", af);
+		error = EAFNOSUPPORT;
+		goto bad;
+	}
+
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -151,7 +174,6 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 			if (error)
 				return (error == EWOULDBLOCK ? 0 : error);
 		}
-		type = ETHERTYPE_IP;
 		break;
 
 	case AF_ARP:
@@ -159,7 +181,6 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		struct arphdr *ah;
 		ah = mtod(m, struct arphdr *);
 		ah->ar_hrd = htons(ARPHRD_IEEE1394);
-		type = ETHERTYPE_ARP;
 		if (unicast)
 			*destfw = *(struct fw_hwaddr *) ar_tha(ah);
 
@@ -181,7 +202,6 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 			if (error)
 				return (error == EWOULDBLOCK ? 0 : error);
 		}
-		type = ETHERTYPE_IPV6;
 		break;
 #endif
 

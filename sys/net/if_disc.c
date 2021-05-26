@@ -184,6 +184,8 @@ discoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
+	else if (ro != NULL && ro->ro_flags & RT_HAS_GW)
+		af = ro->ro_dst.sa_family;
 	else
 		af = dst->sa_family;
 

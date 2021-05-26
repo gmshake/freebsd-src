@@ -533,12 +533,14 @@ drop:
 
 static int
 me_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
-   struct route *ro __unused)
+   struct route *ro)
 {
 	uint32_t af;
 
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
+	else if (ro != NULL && ro->ro_flags & RT_HAS_GW)
+		af = ro->ro_dst.sa_family;
 	else
 		af = dst->sa_family;
 	m->m_pkthdr.csum_data = af;

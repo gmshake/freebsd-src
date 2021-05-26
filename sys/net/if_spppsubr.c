@@ -805,6 +805,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		 * dialout event in case IPv6 has been
 		 * administratively disabled on that interface.
 		 */
+		/* FIXME get af from ro->ro_dst ??? */
 		if (dst->sa_family == AF_INET6 &&
 		    !(sp->confflags & CONF_ENABLE_IPV6))
 			goto drop;

@@ -301,6 +301,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	bool addref;
+	int af = dst->sa_family;
 
 	NET_EPOCH_ASSERT();
 
@@ -338,6 +339,8 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 				pflags = lle->r_flags;
 			}
 		}
+		if (ro->ro_flags & RT_HAS_GW)
+			af = ro->ro_dst.sa_family;
 	}
 
 #ifdef MAC
@@ -371,7 +374,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, af, 0));
 	}
 
 	/*
@@ -386,6 +389,15 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		ih = mtod(m, struct infiniband_header *);
 		memcpy(ih, phdr, hlen);
+#if defined(INET) && defined(INET6)
+		/* XXX phdr might be from lle cache, let's fix the ether_type */
+		if (dst->sa_family != af) {
+			if (af == AF_INET)
+				ih->ib_protocol = htons(ETHERTYPE_IP);
+			else if (af == AF_INET6)
+				ih->ib_protocol = htons(ETHERTYPE_IPV6);
+		}
+#endif
 	}
 
 	/*

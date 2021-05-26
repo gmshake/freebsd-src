@@ -290,6 +290,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	uint32_t pflags;
 	struct llentry *lle = NULL;
 	int addref = 0;
+	int af = dst->sa_family;
 
 	phdr = NULL;
 	pflags = 0;
@@ -324,6 +325,8 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 				pflags = lle->r_flags;
 			}
 		}
+		if (ro->ro_flags & RT_HAS_GW)
+			af = ro->ro_dst.sa_family;
 	}
 
 #ifdef MAC
@@ -353,7 +356,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, af, 0));
 	}
 	loop_copy = (pflags & RT_MAY_LOOP) != 0;
 
@@ -371,6 +374,18 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		eh = mtod(m, struct ether_header *);
 		memcpy(eh, phdr, hlen);
+#if defined(INET) && defined(INET6)
+		/* XXX phdr might be from lle cache, let's fix the ether_type */
+		if (dst->sa_family != af) {
+			uint16_t etype = 0;
+			if (af == AF_INET)
+				etype = htons(ETHERTYPE_IP);
+			else if (af == AF_INET6)
+				etype = htons(ETHERTYPE_IPV6);
+			if (etype != 0)
+				memcpy(&eh->ether_type, &etype, sizeof(etype));
+		}
+#endif
 	}
 
 	/*
@@ -400,7 +415,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		 */
 		if ((n = m_dup(m, M_NOWAIT)) != NULL) {
 			update_mbuf_csumflags(m, n);
-			(void)if_simloop(ifp, n, dst->sa_family, hlen);
+			(void)if_simloop(ifp, n, af, hlen);
 		} else
 			if_inc_counter(ifp, IFCOUNTER_IQDROPS, 1);
 	}
