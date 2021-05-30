@@ -106,17 +106,12 @@ SYSCTL_UINT(_net_route, OID_AUTO, multipath, _MP_FLAGS | CTLFLAG_VNET,
     &VNET_NAME(rib_route_multipath), 0, "Enable route multipath");
 #undef _MP_FLAGS
 
-/*
-#define V_rib_route_ipv4_nexthop VNET(rib_route_ipv4_nexthop)
-VNET_DEFINE(u_int, rib_route_ipv4_nexthop) = 1;
-SYSCTL_UINT(_net_route, OID_AUTO, ipv4_nexthop, CTLFLAG_RW | CTLFLAG_VNET,
-    &VNET_NAME(rib_route_ipv4_nexthop), 0, "Enable IPv6 route via IPv4 Next Hop address");
-*/
-
+#if defined(INET) && defined(INET6)
 #define V_rib_route_ipv6_nexthop VNET(rib_route_ipv6_nexthop)
 VNET_DEFINE(u_int, rib_route_ipv6_nexthop) = 1;
 SYSCTL_UINT(_net_route, OID_AUTO, ipv6_nexthop, CTLFLAG_RW | CTLFLAG_VNET,
     &VNET_NAME(rib_route_ipv6_nexthop), 0, "Enable IPv4 route via IPv6 Next Hop address");
+#endif
 
 /* Routing table UMA zone */
 VNET_DEFINE_STATIC(uma_zone_t, rtzone);
@@ -209,20 +204,7 @@ get_rnh(uint32_t fibnum, const struct rt_addrinfo *info)
 	return (rnh);
 }
 
-/*
-static bool
-rib_can_ipv4_nexthop_address(struct rib_head *rh)
-{
-	int result;
-
-	CURVNET_SET(rh->rib_vnet);
-	result = !!V_rib_route_ipv4_nexthop;
-	CURVNET_RESTORE();
-
-	return (result);
-}
-*/
-
+#if defined(INET) && defined(INET6)
 static bool
 rib_can_ipv6_nexthop_address(struct rib_head *rh)
 {
@@ -234,6 +216,7 @@ rib_can_ipv6_nexthop_address(struct rib_head *rh)
 
 	return (result);
 }
+#endif
 
 #ifdef ROUTE_MPATH
 static bool
@@ -620,7 +603,13 @@ check_gateway(struct rib_head *rnh, struct sockaddr *dst,
 		return (true);
 	else if (gateway->sa_family == AF_LINK)
 		return (true);
-	return (false);
+#if defined(INET) && defined(INET6)
+	else if (dst->sa_family == AF_INET && gateway->sa_family == AF_INET6 &&
+		rib_can_ipv6_nexthop_address(rnh))
+		return (true);
+#endif
+	else
+		return (false);
 }
 
 /*
@@ -645,17 +634,8 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 
 	if ((flags & RTF_GATEWAY) && !gateway)
 		return (EINVAL);
-	if (dst && gateway && (dst->sa_family != gateway->sa_family) && 
-	    (gateway->sa_family != AF_UNSPEC) && (gateway->sa_family != AF_LINK)) {
-		if (dst->sa_family == AF_INET
-			&& gateway->sa_family == AF_INET6
-			&& rib_can_ipv6_nexthop_address(rnh)) {
-		} /* else if (dst->sa_family == AF_INET6
-			&& gateway->sa_family == AF_INET
-			&& !rib_can_ipv4_nexthop_address(rnh)) {
-		} */ else
-			return (EINVAL);
-	}
+	if (dst && gateway && !check_gateway(rnh, dst, gateway))
+		return (EINVAL);
 
 	if (dst->sa_len > sizeof(((struct rtentry *)NULL)->rt_dstb))
 		return (EINVAL);
