@@ -401,7 +401,7 @@ static int addr4_resolve(struct sockaddr_in *src_in,
 		/* XXX check nh->gw_sa.sa_family */
 		if (is_gw && nh->gw_sa.sa_family == AF_INET6)
 			error = nd6_resolve(ifp, is_gw, NULL, &nh->gw_sa, edst,
-				    NULL, NULL);
+			    NULL, NULL);
 		else
 #endif
 			error = arpresolve(ifp, is_gw, NULL, is_gw ?

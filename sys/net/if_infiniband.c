@@ -301,7 +301,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	bool addref;
-	int af = dst->sa_family;
+	int af = RO_GET_FAMILY(ro, dst);
 
 	NET_EPOCH_ASSERT();
 
@@ -339,8 +339,6 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 				pflags = lle->r_flags;
 			}
 		}
-		if (ro->ro_flags & RT_HAS_GW)
-			af = ro->ro_dst.sa_family;
 	}
 
 #ifdef MAC

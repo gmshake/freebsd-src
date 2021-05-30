@@ -370,10 +370,8 @@ ng_iface_output(struct ifnet *ifp, struct mbuf *m,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	else if (ro != NULL && ro->ro_flags & RT_HAS_GW)
-		af = ro->ro_dst.sa_family;
 	else
-		af = dst->sa_family;
+		af = RO_GET_FAMILY(ro, dst);
 
 	/* Berkeley packet filter */
 	ng_iface_bpftap(ifp, m, af);

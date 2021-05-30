@@ -94,7 +94,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #if defined(INET) || defined(INET6)
 	int is_gw = 0;
 #endif
-	int af = dst->sa_family;
+	int af = RO_GET_FAMILY(ro, dst);
 
 #ifdef MAC
 	error = mac_ifnet_check_transmit(ifp, m);
@@ -111,8 +111,6 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #if defined(INET) || defined(INET6)
 	if (ro != NULL)
 		is_gw = (ro->ro_flags & RT_HAS_GW) != 0;
-	if (is_gw)
-		af = ro->ro_dst.sa_family;
 #endif
 	/*
 	 * For unicast, we make a tag to store the lladdr of the

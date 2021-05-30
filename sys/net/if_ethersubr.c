@@ -290,7 +290,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	uint32_t pflags;
 	struct llentry *lle = NULL;
 	int addref = 0;
-	int af = dst->sa_family;
+	int af = RO_GET_FAMILY(ro, dst);
 
 	phdr = NULL;
 	pflags = 0;
@@ -325,8 +325,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 				pflags = lle->r_flags;
 			}
 		}
-		if (ro->ro_flags & RT_HAS_GW)
-			af = ro->ro_dst.sa_family;
 	}
 
 #ifdef MAC
