@@ -815,11 +815,6 @@ ia_need_loopback_route(const struct in_ifaddr *ia)
 	    ia->ia_dstaddr.sin_addr.s_addr == ia->ia_addr.sin_addr.s_addr)
 		return (false);
 
-	/* Case 2: skip /32 prefixes */
-	if (!(ifp->if_flags & IFF_POINTOPOINT) &&
-	    (ia->ia_sockmask.sin_addr.s_addr == INADDR_BROADCAST))
-		return (false);
-
 	return (true);
 }
 
@@ -935,6 +930,14 @@ in_addprefix(struct in_ifaddr *target)
 {
 	int error;
 
+	/*
+	 * Skip /32 interface aliases.
+	 */
+	if (!(target->ia_ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) &&
+	    (target->ia_sockmask.sin_addr.s_addr == INADDR_BROADCAST)) {
+		rt_addrmsg(RTM_ADD, &target->ia_ifa, target->ia_ifp->if_fib);
+		return (0);
+	}
 	if (in_hasrtprefix(target)) {
 		if (V_nosameprefix)
 			return (EEXIST);
