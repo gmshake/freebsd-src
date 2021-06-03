@@ -45,6 +45,9 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -489,6 +492,7 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
+			route_cache_invalidate(sc->gre_route_cache);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET6;
@@ -524,15 +528,23 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 }
 
 int
-in6_gre_output(struct mbuf *m, int af __unused, int hlen __unused,
-    uint32_t flowid)
+in6_gre_output(struct ifnet *ifp, struct mbuf *m, int af __unused,
+    int hlen __unused, uint32_t flowid)
 {
+	struct gre_softc *sc = ifp->if_softc;
 	struct greip6 *gi6;
+	struct route_cache *rc;
+	int error;
 
 	gi6 = mtod(m, struct greip6 *);
 	gi6->gi6_ip6.ip6_hlim = V_ip6_gre_hlim;
 	gi6->gi6_ip6.ip6_flow |= flowid & IPV6_FLOWLABEL_MASK;
-	return (ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, NULL, NULL));
+
+	rc = ROUTE_CACHE_GET(sc->gre_route_cache);
+	ROUTE_CACHE_LOCK(rc);
+	error = ip6_output(m, NULL, &rc->ro6, IPV6_MINMTU, NULL, NULL, NULL);
+	ROUTE_CACHE_UNLOCK(rc);
+	return (error);
 }
 
 static const struct srcaddrtab *ipv6_srcaddrtab = NULL;

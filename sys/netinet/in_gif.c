@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -241,6 +243,7 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
+			route_cache_invalidate(sc->gif_route_cache);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET;
@@ -275,7 +278,9 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 {
 	struct gif_softc *sc = ifp->if_softc;
 	struct ip *ip;
+	struct route_cache *rc;
 	int len;
+	int error;
 
 	/* prepend new IP header */
 	NET_EPOCH_ASSERT();
@@ -306,7 +311,11 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip->ip_len = htons(m->m_pkthdr.len);
 	ip->ip_tos = ecn;
 
-	return (ip_output(m, NULL, NULL, 0, NULL, NULL));
+	rc = ROUTE_CACHE_GET(sc->gif_route_cache);
+	ROUTE_CACHE_LOCK(rc);
+	error = ip_output(m, NULL, &rc->ro, 0, NULL, NULL);
+	ROUTE_CACHE_UNLOCK(rc);
+	return (error);
 }
 
 static int

@@ -55,6 +55,9 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -482,6 +485,7 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
+			route_cache_invalidate(sc->gre_route_cache);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET;
@@ -515,9 +519,12 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 }
 
 int
-in_gre_output(struct mbuf *m, int af, int hlen)
+in_gre_output(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 {
+	struct gre_softc *sc = ifp->if_softc;
 	struct greip *gi;
+	struct route_cache *rc;
+	int error;
 
 	gi = mtod(m, struct greip *);
 	switch (af) {
@@ -541,7 +548,12 @@ in_gre_output(struct mbuf *m, int af, int hlen)
 	}
 	gi->gi_ip.ip_ttl = V_ip_gre_ttl;
 	gi->gi_ip.ip_len = htons(m->m_pkthdr.len);
-	return (ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL));
+
+	rc = ROUTE_CACHE_GET(sc->gre_route_cache);
+	ROUTE_CACHE_LOCK(rc);
+	error = ip_output(m, NULL, &rc->ro, IP_FORWARDING, NULL, NULL);
+	ROUTE_CACHE_UNLOCK(rc);
+	return (error);
 }
 
 static const struct srcaddrtab *ipv4_srcaddrtab = NULL;

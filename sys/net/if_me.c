@@ -23,6 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "opt_inet.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -52,6 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/vnet.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -81,6 +84,7 @@ struct me_softc {
 	u_int			me_fibnum;
 	struct in_addr		me_src;
 	struct in_addr		me_dst;
+	route_cache_t		me_route_cache;
 
 	CK_LIST_ENTRY(me_softc) chain;
 	CK_LIST_ENTRY(me_softc) srchash;
@@ -192,6 +196,7 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct me_softc *sc;
 
 	sc = malloc(sizeof(struct me_softc), M_IFME, M_WAITOK | M_ZERO);
+	sc->me_route_cache = route_cache_alloc(M_WAITOK);
 	sc->me_fibnum = curthread->td_proc->p_fibnum;
 	ME2IFP(sc) = if_alloc(IFT_TUNNEL);
 	ME2IFP(sc)->if_softc = sc;
@@ -243,6 +248,7 @@ me_clone_destroy(struct ifnet *ifp)
 
 	ME_WAIT();
 	if_free(ifp);
+	route_cache_free(sc->me_route_cache);
 	free(sc, M_IFME);
 }
 
@@ -449,6 +455,7 @@ me_delete_tunnel(struct me_softc *sc)
 
 		sc->me_src.s_addr = 0;
 		sc->me_dst.s_addr = 0;
+		route_cache_invalidate(sc->me_route_cache);
 		ME2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 		if_link_state_change(ME2IFP(sc), LINK_STATE_DOWN);
 	}
@@ -557,6 +564,7 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct me_softc *sc;
 	struct ip *ip;
 	uint32_t af;
+	struct route_cache *rc;
 	int error, hlen, plen;
 
 	ME_RLOCK();
@@ -630,7 +638,10 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	mh.mob_csum = 0;
 	mh.mob_csum = me_in_cksum((uint16_t *)&mh, hlen / sizeof(uint16_t));
 	bcopy(&mh, mtodo(m, sizeof(struct ip)), hlen);
-	error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
+	rc = ROUTE_CACHE_GET(sc->me_route_cache);
+	ROUTE_CACHE_LOCK(rc);
+	error = ip_output(m, NULL, &rc->ro, IP_FORWARDING, NULL, NULL);
+	ROUTE_CACHE_UNLOCK(rc);
 drop:
 	if (error)
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);

@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
 
@@ -141,6 +143,7 @@ gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gif_softc *sc;
 
 	sc = malloc(sizeof(struct gif_softc), M_GIF, M_WAITOK | M_ZERO);
+	sc->gif_route_cache = route_cache_alloc(M_WAITOK);
 	sc->gif_fibnum = curthread->td_proc->p_fibnum;
 	GIF2IFP(sc) = if_alloc(IFT_GIF);
 	GIF2IFP(sc)->if_softc = sc;
@@ -198,6 +201,7 @@ gif_clone_destroy(struct ifnet *ifp)
 
 	GIF_WAIT();
 	if_free(ifp);
+	route_cache_free(sc->gif_route_cache);
 	free(sc, M_GIF);
 }
 
@@ -716,6 +720,7 @@ gif_delete_tunnel(struct gif_softc *sc)
 		/* Wait until it become safe to free gif_hdr */
 		GIF_WAIT();
 		free(sc->gif_hdr, M_GIF);
+		route_cache_invalidate(sc->gif_route_cache);
 	}
 	sc->gif_family = 0;
 	GIF2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;

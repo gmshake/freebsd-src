@@ -106,6 +106,7 @@ struct gre_softc {
 #endif
 	} gre_uhdr;
 	struct gre_socket	*gre_so;
+	route_cache_t		gre_route_cache;
 
 	CK_LIST_ENTRY(gre_softc) chain;
 	CK_LIST_ENTRY(gre_softc) srchash;
@@ -145,13 +146,13 @@ void	in_gre_init(void);
 void	in_gre_uninit(void);
 int	in_gre_setopts(struct gre_softc *, u_long, uint32_t);
 int	in_gre_ioctl(struct gre_softc *, u_long, caddr_t);
-int	in_gre_output(struct mbuf *, int, int);
+int	in_gre_output(struct ifnet *, struct mbuf *, int, int);
 
 void	in6_gre_init(void);
 void	in6_gre_uninit(void);
 int	in6_gre_setopts(struct gre_softc *, u_long, uint32_t);
 int	in6_gre_ioctl(struct gre_softc *, u_long, caddr_t);
-int	in6_gre_output(struct mbuf *, int, int, uint32_t);
+int	in6_gre_output(struct ifnet *, struct mbuf *, int, int, uint32_t);
 /*
  * CISCO uses special type for GRE tunnel created as part of WCCP
  * connection, while in fact those packets are just IPv4 encapsulated

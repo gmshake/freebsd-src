@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/vnet.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_cache.h>
 
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
@@ -175,6 +177,7 @@ gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gre_softc *sc;
 
 	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK | M_ZERO);
+	sc->gre_route_cache = route_cache_alloc(M_WAITOK);
 	sc->gre_fibnum = curthread->td_proc->p_fibnum;
 	GRE2IFP(sc) = if_alloc(IFT_TUNNEL);
 	GRE2IFP(sc)->if_softc = sc;
@@ -226,6 +229,7 @@ gre_clone_destroy(struct ifnet *ifp)
 
 	GRE_WAIT();
 	if_free(ifp);
+	route_cache_free(sc->gre_route_cache);
 	free(sc, M_GRE);
 }
 
@@ -404,6 +408,7 @@ gre_delete_tunnel(struct gre_softc *sc)
 		CK_LIST_REMOVE(sc, srchash);
 		GRE_WAIT();
 		free(sc->gre_hdr, M_GRE);
+		route_cache_invalidate(sc->gre_route_cache);
 		sc->gre_family = 0;
 	}
 	/*
@@ -779,12 +784,12 @@ gre_transmit(struct ifnet *ifp, struct mbuf *m)
 	switch (sc->gre_family) {
 #ifdef INET
 	case AF_INET:
-		error = in_gre_output(m, af, sc->gre_hlen);
+		error = in_gre_output(ifp, m, af, sc->gre_hlen);
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		error = in6_gre_output(m, af, sc->gre_hlen, flowid);
+		error = in6_gre_output(ifp, m, af, sc->gre_hlen, flowid);
 		break;
 #endif
 	default:
