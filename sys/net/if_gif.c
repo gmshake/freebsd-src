@@ -62,8 +62,10 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_clone.h>
 #include <net/if_types.h>
+#include <net/if_llatbl.h>
 #include <net/netisr.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
 
@@ -715,6 +717,7 @@ gif_delete_tunnel(struct gif_softc *sc)
 		CK_LIST_REMOVE(sc, chain);
 		/* Wait until it become safe to free gif_hdr */
 		GIF_WAIT();
+		RO_INVALIDATE_CACHE(&sc->gif_route);
 		free(sc->gif_hdr, M_GIF);
 	}
 	sc->gif_family = 0;

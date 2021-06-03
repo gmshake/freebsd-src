@@ -54,7 +54,9 @@ __FBSDID("$FreeBSD$");
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_llatbl.h>
 #include <net/route.h>
+#include <net/route/nhop.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -256,10 +258,12 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
+			RO_INVALIDATE_CACHE(&sc->gif_route6);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET6;
 		sc->gif_ip6hdr = ip6;
+		sc->gif_route6.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 		in6_gif_attach(sc);
 		in6_gif_set_running(sc);
 		break;
@@ -324,7 +328,7 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	return (ip6_output(m, 0, NULL, IPV6_MINMTU, 0, NULL, NULL));
+	return (ip6_output(m, 0, &sc->gif_route6, IPV6_MINMTU, 0, NULL, NULL));
 }
 
 static int

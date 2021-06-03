@@ -61,6 +61,10 @@ struct gif_softc {
 		struct ip	*iphdr;
 		struct ip6_hdr	*ip6hdr;
 	} gif_uhdr;
+	union {					/* cached L3 information */
+		struct route	gif_route;
+		struct route_in6 gif_route6;
+	};
 
 	CK_LIST_ENTRY(gif_softc) chain;
 	CK_LIST_ENTRY(gif_softc) srchash;
