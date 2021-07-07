@@ -57,11 +57,13 @@ __FBSDID("$FreeBSD$");
     PMC_CAP_INVERT | PMC_CAP_QUALIFIER | PMC_CAP_PRECISE)
 
 #define	SELECTSEL(x) \
-	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL) ? \
+	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL || \
+	  (x) == PMC_CPU_INTEL_BROADWELL) ? \
 	UCP_CB0_EVSEL0 : UCP_EVSEL0)
 
 #define SELECTOFF(x) \
-	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL) ? \
+	(((x) == PMC_CPU_INTEL_SANDYBRIDGE || (x) == PMC_CPU_INTEL_HASWELL || \
+	  (x) == PMC_CPU_INTEL_BROADWELL) ? \
 	UCF_OFFSET_SB : UCF_OFFSET)
 
 static enum pmc_cputype	uncore_cputype;
@@ -529,6 +531,9 @@ ucp_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	    ("[uncore,%d] illegal CPU %d", __LINE__, cpu));
 	KASSERT(ri >= 0 && ri < uncore_ucp_npmc,
 	    ("[uncore,%d] illegal row-index value %d", __LINE__, ri));
+
+	if (a->pm_class != PMC_CLASS_UCP)
+		return (EINVAL);
 
 	/* check requested capabilities */
 	caps = a->pm_caps;

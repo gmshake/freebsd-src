@@ -179,7 +179,7 @@ pmc_intel_initialize(void)
 		case 0x3D:
 		case 0x47:
 			cputype = PMC_CPU_INTEL_BROADWELL;
-			nclasses = 3;
+			nclasses = 5;
 			break;
 		case 0x4f:
 		case 0x56:
