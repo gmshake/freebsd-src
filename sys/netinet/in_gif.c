@@ -237,6 +237,7 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip = malloc(sizeof(*ip), M_GIF, M_WAITOK | M_ZERO);
 		ip->ip_src.s_addr = src->sin_addr.s_addr;
 		ip->ip_dst.s_addr = dst->sin_addr.s_addr;
+		gif_unsubscribe_rib_event(sc);
 		if (sc->gif_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
@@ -252,6 +253,7 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		NET_EPOCH_ENTER(et);
 		in_gif_set_running(sc);
 		NET_EPOCH_EXIT(et);
+		gif_subscribe_rib_event(sc);
 		break;
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:

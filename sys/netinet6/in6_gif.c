@@ -252,6 +252,7 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
 		ip6->ip6_vfc = IPV6_VERSION;
+		gif_unsubscribe_rib_event(sc);
 		if (sc->gif_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
@@ -264,6 +265,7 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		sc->gif_family = AF_INET6;
 		sc->gif_ip6hdr = ip6;
 		in6_gif_attach(sc);
+		gif_subscribe_rib_event(sc);
 		in6_gif_set_running(sc);
 		break;
 	case SIOCGIFPSRCADDR_IN6:

@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/route_cache.h>
+#include <net/route/route_ctl.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
 
@@ -592,6 +593,31 @@ drop:
 	if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
 }
 
+static void
+gif_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc, void *arg)
+{
+	route_cache_t r = arg;
+	route_cache_invalidate(r);
+}
+
+void
+gif_subscribe_rib_event(struct gif_softc *sc)
+{
+	if (sc->gif_family != 0)
+		sc->rs = rib_subscribe(sc->gif_fibnum, sc->gif_family,
+		    gif_subscription_cb, sc->gif_route_cache,
+		    RIB_NOTIFY_IMMEDIATE, true);
+}
+
+void
+gif_unsubscribe_rib_event(struct gif_softc *sc)
+{
+	if (sc->rs) {
+		rib_unsibscribe(sc->rs);
+		sc->rs = NULL;
+	}
+}
+
 static int
 gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
@@ -651,8 +677,11 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else {
 			sc->gif_fibnum = ifr->ifr_fib;
+			gif_unsubscribe_rib_event(sc);
+			gif_subscribe_rib_event(sc);
+		}
 		break;
 	case GIFGOPTS:
 		options = sc->gif_options;
@@ -714,6 +743,7 @@ gif_delete_tunnel(struct gif_softc *sc)
 {
 
 	sx_assert(&gif_ioctl_sx, SA_XLOCKED);
+	gif_unsubscribe_rib_event(sc);
 	if (sc->gif_family != 0) {
 		CK_LIST_REMOVE(sc, srchash);
 		CK_LIST_REMOVE(sc, chain);
