@@ -565,6 +565,8 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct ip *ip;
 	uint32_t af;
 	struct route_cache *rc;
+	struct route *ro = NULL;
+	int route_cache_locked = 0;
 	int error, hlen, plen;
 
 	ME_RLOCK();
@@ -639,9 +641,13 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	mh.mob_csum = me_in_cksum((uint16_t *)&mh, hlen / sizeof(uint16_t));
 	bcopy(&mh, mtodo(m, sizeof(struct ip)), hlen);
 	rc = ROUTE_CACHE_GET(sc->me_route_cache);
-	ROUTE_CACHE_LOCK(rc);
-	error = ip_output(m, NULL, &rc->ro, IP_FORWARDING, NULL, NULL);
-	ROUTE_CACHE_UNLOCK(rc);
+	if (ROUTE_CACHE_TRYLOCK(rc)) {
+		route_cache_locked = 1;
+		ro = &rc->ro;
+	}
+	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
+	if (route_cache_locked)
+		ROUTE_CACHE_UNLOCK(rc);
 drop:
 	if (error)
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);

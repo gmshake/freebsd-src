@@ -524,6 +524,8 @@ in_gre_output(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 	struct gre_softc *sc = ifp->if_softc;
 	struct greip *gi;
 	struct route_cache *rc;
+	struct route *ro = NULL;
+	int route_cache_locked = 0;
 	int error;
 
 	gi = mtod(m, struct greip *);
@@ -550,9 +552,13 @@ in_gre_output(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 	gi->gi_ip.ip_len = htons(m->m_pkthdr.len);
 
 	rc = ROUTE_CACHE_GET(sc->gre_route_cache);
-	ROUTE_CACHE_LOCK(rc);
-	error = ip_output(m, NULL, &rc->ro, IP_FORWARDING, NULL, NULL);
-	ROUTE_CACHE_UNLOCK(rc);
+	if (ROUTE_CACHE_TRYLOCK(rc)) {
+		route_cache_locked = 1;
+		ro = &rc->ro;
+	}
+	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
+	if (route_cache_locked)
+		ROUTE_CACHE_UNLOCK(rc);
 	return (error);
 }
 

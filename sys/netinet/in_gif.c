@@ -279,6 +279,8 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	struct gif_softc *sc = ifp->if_softc;
 	struct ip *ip;
 	struct route_cache *rc;
+	struct route *ro = NULL;
+	int route_cache_locked = 0;
 	int len;
 	int error;
 
@@ -312,9 +314,13 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip->ip_tos = ecn;
 
 	rc = ROUTE_CACHE_GET(sc->gif_route_cache);
-	ROUTE_CACHE_LOCK(rc);
-	error = ip_output(m, NULL, &rc->ro, 0, NULL, NULL);
-	ROUTE_CACHE_UNLOCK(rc);
+	if (ROUTE_CACHE_TRYLOCK(rc)) {
+		route_cache_locked = 1;
+		ro = &rc->ro;
+	}
+	error = ip_output(m, NULL, ro, 0, NULL, NULL);
+	if (route_cache_locked)
+		ROUTE_CACHE_UNLOCK(rc);
 	return (error);
 }
 

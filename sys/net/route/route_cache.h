@@ -43,6 +43,7 @@ typedef struct route_cache {
 } * route_cache_t;
 
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
+#define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
