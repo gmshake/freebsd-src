@@ -30,7 +30,7 @@
 #ifndef _NET_ROUTE_ROUTE_CACHE_H_
 #define _NET_ROUTE_ROUTE_CACHE_H_
 
-typedef struct route_cache {
+struct route_cache {
 	struct mtx rt_mtx;
 	union {
 #ifdef INET
@@ -40,15 +40,18 @@ typedef struct route_cache {
 		struct route_in6 ro6;
 #endif
 	};
-} * route_cache_t;
+};
 
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
-route_cache_t route_cache_alloc(int flags);
-void route_cache_free(route_cache_t cache);
-void route_cache_invalidate(route_cache_t cache);
+struct route_cache * route_cache_alloc(int flags);
+void route_cache_free(struct route_cache *);
+void route_cache_invalidate(struct route_cache *);
+
+struct rib_subscription * route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
+void route_cache_unsubscribe_rib_event(struct rib_subscription *);
 
 #endif

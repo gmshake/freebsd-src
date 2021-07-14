@@ -37,6 +37,7 @@
 #define _NET_IF_GRE_H_
 
 #ifdef _KERNEL
+struct route_cache;
 /* GRE header according to RFC 2784 and RFC 2890 */
 struct grehdr {
 	uint16_t	gre_flags;	/* GRE flags */
@@ -106,7 +107,7 @@ struct gre_softc {
 #endif
 	} gre_uhdr;
 	struct gre_socket	*gre_so;
-	route_cache_t		gre_route_cache;
+	struct route_cache	*gre_route_cache;
 
 	CK_LIST_ENTRY(gre_softc) chain;
 	CK_LIST_ENTRY(gre_softc) srchash;

@@ -55,8 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
-#include <net/route/nhop.h>
-#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -74,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/in6_fib.h>
 
 #include <net/if_gif.h>
+#include <net/route/route_cache.h>
 
 #define GIF_HLIM	30
 VNET_DEFINE_STATIC(int, ip6_gif_hlim) = GIF_HLIM;

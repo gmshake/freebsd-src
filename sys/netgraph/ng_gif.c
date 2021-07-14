@@ -80,15 +80,11 @@
 #include <sys/socket.h>
 
 #include <net/if.h>
+#include <net/route.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
-#include <net/route.h>
-#include <net/route/route_cache.h>
-#include <net/vnet.h>
-
-#include <netinet/in.h>
-
 #include <net/if_gif.h>
+#include <net/vnet.h>
 
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>

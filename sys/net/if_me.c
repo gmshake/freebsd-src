@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/vnet.h>
 #include <net/route.h>
-#include <net/route/nhop.h>
 #include <net/route/route_cache.h>
 
 #include <netinet/in.h>
@@ -84,7 +83,7 @@ struct me_softc {
 	u_int			me_fibnum;
 	struct in_addr		me_src;
 	struct in_addr		me_dst;
-	route_cache_t		me_route_cache;
+	struct route_cache	*me_route_cache;
 
 	CK_LIST_ENTRY(me_softc) chain;
 	CK_LIST_ENTRY(me_softc) srchash;

@@ -64,8 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/route.h>
-#include <net/route/nhop.h>
-#include <net/route/route_cache.h>
 #include <net/route/route_ctl.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
@@ -93,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <net/ethernet.h>
 #include <net/if_bridgevar.h>
 #include <net/if_gif.h>
+#include <net/route/route_cache.h>
 
 #include <security/mac/mac_framework.h>
 
@@ -593,27 +592,19 @@ drop:
 	if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
 }
 
-static void
-gif_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc, void *arg)
-{
-	route_cache_t r = arg;
-	route_cache_invalidate(r);
-}
-
 void
 gif_subscribe_rib_event(struct gif_softc *sc)
 {
 	if (sc->gif_family != 0)
-		sc->rs = rib_subscribe(sc->gif_fibnum, sc->gif_family,
-		    gif_subscription_cb, sc->gif_route_cache,
-		    RIB_NOTIFY_IMMEDIATE, true);
+		sc->rs = route_cache_subscribe_rib_event(sc->gif_fibnum, sc->gif_family,
+		    sc->gif_route_cache);
 }
 
 void
 gif_unsubscribe_rib_event(struct gif_softc *sc)
 {
 	if (sc->rs) {
-		rib_unsibscribe(sc->rs);
+		route_cache_unsubscribe_rib_event(sc->rs);
 		sc->rs = NULL;
 	}
 }

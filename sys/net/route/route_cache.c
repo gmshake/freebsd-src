@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/route_cache.h>
+#include <net/route/route_ctl.h>
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
@@ -78,47 +79,68 @@ route_cache_zone_uninit(void)
 SYSUNINIT(route_cache_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
     route_cache_zone_uninit, NULL);
 
-route_cache_t
+struct route_cache *
 route_cache_alloc(int flags)
 {
 	int i;
 	struct route_cache *c;
-	route_cache_t cache = uma_zalloc_pcpu(pcpu_route_cache_zone, flags | M_ZERO);
+	struct route_cache *pcpu_rc = uma_zalloc_pcpu(pcpu_route_cache_zone, flags | M_ZERO);
 	critical_enter();
 	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(cache, i);
+		c = zpcpu_get_cpu(pcpu_rc, i);
 		c->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 		mtx_init(&c->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
 	}
 	critical_exit();
-	return (cache);
+	return (pcpu_rc);
 }
 
 void
-route_cache_free(route_cache_t cache)
+route_cache_free(struct route_cache *pcpu_rc)
 {
 	int i;
 	struct route_cache *c;
 	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(cache, i);
+		c = zpcpu_get_cpu(pcpu_rc, i);
 		mtx_lock(&c->rt_mtx);
 		RO_INVALIDATE_CACHE(&c->ro);
 		mtx_unlock(&c->rt_mtx);
 		mtx_destroy(&c->rt_mtx);
 	}
-	uma_zfree_pcpu(pcpu_route_cache_zone, cache);
+	uma_zfree_pcpu(pcpu_route_cache_zone, pcpu_rc);
 }
 
 void
-route_cache_invalidate(route_cache_t cache)
+route_cache_invalidate(struct route_cache *pcpu_rc)
 {
 	int i;
 	struct route_cache *c;
 	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(cache, i);
+		c = zpcpu_get_cpu(pcpu_rc, i);
 		mtx_lock(&c->rt_mtx);
 		RO_INVALIDATE_CACHE(&c->ro);
 		mtx_unlock(&c->rt_mtx);
 	}
 }
 
+static void
+route_cache_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc,
+    void *arg)
+{
+	struct route_cache *pcpu_rc = arg;
+	route_cache_invalidate(pcpu_rc);
+}
+
+struct rib_subscription *
+route_cache_subscribe_rib_event(uint32_t fibnum, int family,
+    struct route_cache *pcpu_rc)
+{
+	return (rib_subscribe(fibnum, family, route_cache_subscription_cb,
+	    pcpu_rc, RIB_NOTIFY_IMMEDIATE, true));
+}
+
+void
+route_cache_unsubscribe_rib_event(struct rib_subscription *rs)
+{
+	rib_unsibscribe(rs);
+}

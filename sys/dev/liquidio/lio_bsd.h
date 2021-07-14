@@ -52,6 +52,7 @@
 
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
+#include <net/if_gif.h>
 
 #include <netinet/in.h>
 #include <netinet/tcp_lro.h>
