@@ -596,16 +596,16 @@ void
 gif_subscribe_rib_event(struct gif_softc *sc)
 {
 	if (sc->gif_family != 0)
-		sc->rs = route_cache_subscribe_rib_event(sc->gif_fibnum, sc->gif_family,
-		    sc->gif_route_cache);
+		sc->gif_rs = route_cache_subscribe_rib_event(sc->gif_fibnum,
+		    sc->gif_family, sc->gif_route_cache);
 }
 
 void
 gif_unsubscribe_rib_event(struct gif_softc *sc)
 {
-	if (sc->rs) {
-		route_cache_unsubscribe_rib_event(sc->rs);
-		sc->rs = NULL;
+	if (sc->gif_rs) {
+		route_cache_unsubscribe_rib_event(sc->gif_rs);
+		sc->gif_rs = NULL;
 	}
 }
 

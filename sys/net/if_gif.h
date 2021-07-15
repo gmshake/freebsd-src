@@ -64,7 +64,7 @@ struct gif_softc {
 		struct ip6_hdr	*ip6hdr;
 	} gif_uhdr;
 	struct route_cache	*gif_route_cache;
-	struct rib_subscription *rs;
+	struct rib_subscription *gif_rs;
 
 	CK_LIST_ENTRY(gif_softc) chain;
 	CK_LIST_ENTRY(gif_softc) srchash;
