@@ -142,5 +142,5 @@ route_cache_subscribe_rib_event(uint32_t fibnum, int family,
 void
 route_cache_unsubscribe_rib_event(struct rib_subscription *rs)
 {
-	rib_unsibscribe(rs);
+	rib_unsubscribe(rs);
 }
