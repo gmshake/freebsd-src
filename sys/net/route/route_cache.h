@@ -40,7 +40,7 @@ struct route_cache {
 		struct route_in6 ro6;
 #endif
 	};
-};
+} __aligned(CACHE_LINE_SIZE);
 
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
