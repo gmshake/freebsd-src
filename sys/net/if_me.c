@@ -84,6 +84,7 @@ struct me_softc {
 	struct in_addr		me_src;
 	struct in_addr		me_dst;
 	struct route_cache	*me_route_cache;
+	struct rib_subscription	*me_rs;
 
 	CK_LIST_ENTRY(me_softc) chain;
 	CK_LIST_ENTRY(me_softc) srchash;
@@ -251,6 +252,23 @@ me_clone_destroy(struct ifnet *ifp)
 	free(sc, M_IFME);
 }
 
+static void
+me_subscribe_rib_event(struct me_softc *sc)
+{
+	if (ME_READY(sc))
+		sc->me_rs = route_cache_subscribe_rib_event(sc->me_fibnum,
+		    AF_INET, sc->me_route_cache);
+}
+
+static void
+me_unsubscribe_rib_event(struct me_softc *sc)
+{
+	if (sc->me_rs) {
+		route_cache_unsubscribe_rib_event(sc->me_rs);
+		sc->me_rs = NULL;
+	}
+}
+
 static int
 me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
@@ -331,8 +349,11 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else {
 			sc->me_fibnum = ifr->ifr_fib;
+			me_unsubscribe_rib_event(sc);
+			me_subscribe_rib_event(sc);
+		}
 		break;
 	default:
 		error = EINVAL;
@@ -439,6 +460,7 @@ me_set_tunnel(struct me_softc *sc, in_addr_t src, in_addr_t dst)
 	me_set_running(sc);
 	NET_EPOCH_EXIT(et);
 	if_link_state_change(ME2IFP(sc), LINK_STATE_UP);
+	me_subscribe_rib_event(sc);
 	return (0);
 }
 
@@ -447,6 +469,7 @@ me_delete_tunnel(struct me_softc *sc)
 {
 
 	sx_assert(&me_ioctl_sx, SA_XLOCKED);
+	me_unsubscribe_rib_event(sc);
 	if (ME_READY(sc)) {
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);
