@@ -38,6 +38,8 @@
 
 #ifdef _KERNEL
 struct route_cache;
+struct rib_subscription;
+
 /* GRE header according to RFC 2784 and RFC 2890 */
 struct grehdr {
 	uint16_t	gre_flags;	/* GRE flags */
@@ -108,6 +110,7 @@ struct gre_softc {
 	} gre_uhdr;
 	struct gre_socket	*gre_so;
 	struct route_cache	*gre_route_cache;
+	struct rib_subscription *gre_rs;
 
 	CK_LIST_ENTRY(gre_softc) chain;
 	CK_LIST_ENTRY(gre_softc) srchash;
@@ -142,6 +145,9 @@ int	gre_input(struct mbuf *, int, int, void *);
 void	gre_update_hdr(struct gre_softc *, struct grehdr *);
 void	gre_update_udphdr(struct gre_softc *, struct udphdr *, uint16_t);
 void	gre_sofree(epoch_context_t);
+
+void	gre_subscribe_rib_event(struct gif_softc *);
+void	gre_unsubscribe_rib_event(struct gif_softc *);
 
 void	in_gre_init(void);
 void	in_gre_uninit(void);
