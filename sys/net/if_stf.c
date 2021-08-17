@@ -427,7 +427,6 @@ stf_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #endif
 
 	sc = ifp->if_softc;
-	/* FIXME possible sockaddr_in gw ? */
 	dst6 = (const struct sockaddr_in6 *)dst;
 
 	/* just in case */

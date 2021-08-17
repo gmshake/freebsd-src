@@ -533,13 +533,6 @@ again:
 		ifp = nh->nh_ifp;
 		mtu = nh->nh_mtu;
 		rt_update_ro_flags(ro, nh);
-		/*
-		 * We are rewriting here dst to be gw actually, contradicting
-		 * comment at the beginning of the function. However, in this
-		 * case we are always dealing with on stack dst.
-		 * In case if pfil(9) sends us back to beginning of the
-		 * function, the dst would be rewritten by ip_output_pfil().
-		 */
 		if (nh->nh_flags & NHF_GATEWAY)
 			gw = &nh->gw_sa;
 		ia = ifatoia(nh->nh_ifa);

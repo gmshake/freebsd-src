@@ -1401,7 +1401,6 @@ tunoutput(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
 	/* BPF writes need to be handled specially. */
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
-	/* FIXME TUN is p-t-p device */
 	else
 		af = RO_GET_FAMILY(ro, dst);
 
