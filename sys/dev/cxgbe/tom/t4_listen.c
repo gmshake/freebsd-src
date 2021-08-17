@@ -1115,12 +1115,8 @@ get_l2te_for_nexthop(struct port_info *pi, struct ifnet *ifp,
 		if (nh->nh_flags & NHF_GATEWAY)
 			if (nh->gw_sa.sa_family == AF_INET)
 				((struct sockaddr_in *)dst)->sin_addr = nh->gw4_sa.sin_addr;
-			else {
-				bzero(dst, sizeof(struct sockaddr_in6));
-				dst->sa_len = sizeof(struct sockaddr_in6);
-				dst->sa_family = AF_INET6;
-				((struct sockaddr_in6 *)dst)->sin6_addr = nh->gw6_sa.sin6_addr;
-			}
+			else
+				*((struct sockaddr_in6 *)dst) = nh->gw6_sa;
 		else
 			((struct sockaddr_in *)dst)->sin_addr = inc->inc_faddr;
 	}
