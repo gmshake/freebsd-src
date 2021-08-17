@@ -107,6 +107,7 @@ SYSCTL_UINT(_net_route, OID_AUTO, multipath, _MP_FLAGS | CTLFLAG_VNET,
 #undef _MP_FLAGS
 
 #if defined(INET) && defined(INET6)
+FEATURE(ipv4_rfc5549_support, "Route IPv4 packets via IPv6 nexthops");
 #define V_rib_route_ipv6_nexthop VNET(rib_route_ipv6_nexthop)
 VNET_DEFINE(u_int, rib_route_ipv6_nexthop) = 1;
 SYSCTL_UINT(_net_route, OID_AUTO, ipv6_nexthop, CTLFLAG_RW | CTLFLAG_VNET,
