@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/netevent.h>
+#include <net/if_llatbl.h>
 #include <rdma/ib_addr.h>
 #include <rdma/ib.h>
 
@@ -398,10 +399,9 @@ static int addr4_resolve(struct sockaddr_in *src_in,
 		bool is_gw = (nh->nh_flags & NHF_GATEWAY) != 0;
 		memset(edst, 0, MAX_ADDR_LEN);
 #ifdef INET6
-		/* XXX check nh->gw_sa.sa_family */
 		if (is_gw && nh->gw_sa.sa_family == AF_INET6)
-			error = nd6_resolve(ifp, is_gw, NULL, &nh->gw_sa, edst,
-			    NULL, NULL);
+			error = nd6_resolve(ifp, LLE_SF(AF_INET, is_gw), NULL,
+			    &nh->gw_sa, edst, NULL, NULL);
 		else
 #endif
 			error = arpresolve(ifp, is_gw, NULL, is_gw ?
