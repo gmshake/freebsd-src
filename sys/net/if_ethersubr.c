@@ -372,18 +372,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		eh = mtod(m, struct ether_header *);
 		memcpy(eh, phdr, hlen);
-#if defined(INET) && defined(INET6)
-		/* XXX phdr might be from lle cache, let's fix the ether_type */
-		if (dst->sa_family != af) {
-			uint16_t etype = 0;
-			if (af == AF_INET)
-				etype = htons(ETHERTYPE_IP);
-			else if (af == AF_INET6)
-				etype = htons(ETHERTYPE_IPV6);
-			if (etype != 0)
-				memcpy(&eh->ether_type, &etype, sizeof(etype));
-		}
-#endif
 	}
 
 	/*

@@ -387,15 +387,6 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	if ((pflags & RT_HAS_HEADER) == 0) {
 		ih = mtod(m, struct infiniband_header *);
 		memcpy(ih, phdr, hlen);
-#if defined(INET) && defined(INET6)
-		/* XXX phdr might be from lle cache, let's fix the ether_type */
-		if (dst->sa_family != af) {
-			if (af == AF_INET)
-				ih->ib_protocol = htons(ETHERTYPE_IP);
-			else if (af == AF_INET6)
-				ih->ib_protocol = htons(ETHERTYPE_IPV6);
-		}
-#endif
 	}
 
 	/*
