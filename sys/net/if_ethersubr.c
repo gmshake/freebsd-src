@@ -291,7 +291,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	uint32_t pflags;
 	struct llentry *lle = NULL;
 	int addref = 0;
-	int af = RO_GET_FAMILY(ro, dst);
 
 	phdr = NULL;
 	pflags = 0;
@@ -355,7 +354,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, af, 0));
+		return (if_simloop(ifp, m, RO_GET_FAMILY(ro, dst), 0));
 	}
 	loop_copy = (pflags & RT_MAY_LOOP) != 0;
 
@@ -402,7 +401,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		 */
 		if ((n = m_dup(m, M_NOWAIT)) != NULL) {
 			update_mbuf_csumflags(m, n);
-			(void)if_simloop(ifp, n, af, hlen);
+			(void)if_simloop(ifp, n, RO_GET_FAMILY(ro, dst), hlen);
 		} else
 			if_inc_counter(ifp, IFCOUNTER_IQDROPS, 1);
 	}

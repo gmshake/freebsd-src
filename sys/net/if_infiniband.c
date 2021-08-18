@@ -302,7 +302,6 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	bool addref;
-	int af = RO_GET_FAMILY(ro, dst);
 
 	NET_EPOCH_ASSERT();
 
@@ -373,7 +372,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, af, 0));
+		return (if_simloop(ifp, m, RO_GET_FAMILY(ro, dst), 0));
 	}
 
 	/*
