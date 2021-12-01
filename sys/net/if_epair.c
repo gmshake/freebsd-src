@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
+#include <sys/rmlock.h>
 #include <sys/smp.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -84,16 +85,18 @@ VNET_DEFINE_STATIC(struct if_clone *, epair_cloner);
 #define	V_epair_cloner	VNET(epair_cloner)
 
 static unsigned int next_index = 0;
-#define	EPAIR_LOCK_INIT()		mtx_init(&epair_n_index_mtx, "epairidx", \
-					    NULL, MTX_DEF)
-#define	EPAIR_LOCK_DESTROY()		mtx_destroy(&epair_n_index_mtx)
-#define	EPAIR_LOCK()			mtx_lock(&epair_n_index_mtx)
-#define	EPAIR_UNLOCK()			mtx_unlock(&epair_n_index_mtx)
+static struct rmlock epair_n_index_rmlock;
+#define	EPAIR_LOCK_INIT()	rm_init_flags(&epair_n_index_rmlock, \
+					    "epairidx", RM_NOWITNESS)
+#define	EPAIR_LOCK_DESTROY()	rm_destroy(&epair_n_index_rmlock)
+#define	EPAIR_RLOCK(tracker)	rm_rlock(&epair_n_index_rmlock, (tracker))
+#define	EPAIR_RUNLOCK(tracker)	rm_runlock(&epair_n_index_rmlock, (tracker))
+#define	EPAIR_WLOCK()		rm_wlock(&epair_n_index_rmlock)
+#define	EPAIR_WUNLOCK()		rm_wunlock(&epair_n_index_rmlock)
 
 static void				*swi_cookie[MAXCPU];	/* swi(9). */
 static STAILQ_HEAD(, epair_softc)	swi_sc[MAXCPU];
 
-static struct mtx epair_n_index_mtx;
 struct epair_softc {
 	struct ifnet	*ifp;		/* This ifp. */
 	struct ifnet	*oifp;		/* other ifp of pair. */
@@ -159,17 +162,17 @@ epair_intr(void *arg)
 {
 	struct epair_softc *sc;
 	uint32_t cpuidx;
+	struct rm_priotracker tracker;
 
 	cpuidx = (uintptr_t)arg;
-	/* If this is a problem, this is a read-mostly situation. */
-	EPAIR_LOCK();
+	EPAIR_RLOCK(&tracker);
 	STAILQ_FOREACH(sc, &swi_sc[cpuidx], entry) {
 		/* Do this lockless. */
 		if (buf_ring_empty(sc->rxring[sc->ridx]))
 			continue;
 		epair_sintr(sc);
 	}
-	EPAIR_UNLOCK();
+	EPAIR_RUNLOCK(&tracker);
 
 	return;
 }
@@ -521,7 +524,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	sca->oifp = scb->ifp;
 	scb->oifp = sca->ifp;
 
-	EPAIR_LOCK();
+	EPAIR_WLOCK();
 #ifdef SMP
 	/* Get an approximate distribution. */
 	hash = next_index % mp_ncpus;
@@ -531,7 +534,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	if (swi_cookie[hash] == NULL) {
 		void *cookie;
 
-		EPAIR_UNLOCK();
+		EPAIR_WUNLOCK();
 		error = swi_add(NULL, epairname,
 		    epair_intr, (void *)(uintptr_t)hash,
 		    SWI_NET, INTR_MPSAFE, &cookie);
@@ -547,14 +550,14 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 			ifc_free_unit(ifc, unit);
 			return (ENOSPC);
 		}
-		EPAIR_LOCK();
+		EPAIR_WLOCK();
 		/* Recheck under lock even though a race is very unlikely. */
 		if (swi_cookie[hash] == NULL) {
 			swi_cookie[hash] = cookie;
 		} else {
-			EPAIR_UNLOCK();
+			EPAIR_WUNLOCK();
 			(void) swi_remove(cookie);
-			EPAIR_LOCK();
+			EPAIR_WLOCK();
 		}
 	}
 	sca->cpuidx = hash;
@@ -563,7 +566,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	scb->cpuidx = hash;
 	STAILQ_INSERT_TAIL(&swi_sc[hash], scb, entry);
 	scb->swi_cookie = swi_cookie[hash];
-	EPAIR_UNLOCK();
+	EPAIR_WUNLOCK();
 
 	/* Initialise pseudo media types. */
 	ifmedia_init(&sca->media, 0, epair_media_change, epair_media_status);
@@ -601,14 +604,14 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	if (hostid == 0) 
 		arc4rand(&hostid, sizeof(hostid), 0);
 
-	EPAIR_LOCK();
+	EPAIR_WLOCK();
 	if (ifp->if_index > next_index)
 		next_index = ifp->if_index;
 	else
 		next_index++;
 
 	key[0] = (uint32_t)next_index;
-	EPAIR_UNLOCK();
+	EPAIR_WUNLOCK();
 	key[1] = (uint32_t)(hostid & 0xffffffff);
 	key[2] = (uint32_t)((hostid >> 32) & 0xfffffffff);
 	hash = jenkins_hash32(key, 3, 0);
@@ -707,10 +710,10 @@ epair_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 	ether_ifdetach(oifp);
 
 	/* Second stop interrupt handler. */
-	EPAIR_LOCK();
+	EPAIR_WLOCK();
 	STAILQ_REMOVE(&swi_sc[sca->cpuidx], sca, epair_softc, entry);
 	STAILQ_REMOVE(&swi_sc[scb->cpuidx], scb, epair_softc, entry);
-	EPAIR_UNLOCK();
+	EPAIR_WUNLOCK();
 	sca->swi_cookie = NULL;
 	scb->swi_cookie = NULL;
 
@@ -777,15 +780,15 @@ epair_modevent(module_t mod, int type, void *data)
 			printf("%s: %s initialized.\n", __func__, epairname);
 		break;
 	case MOD_UNLOAD:
-		EPAIR_LOCK();
+		EPAIR_WLOCK();
 		for (i = 0; i < MAXCPU; i++) {
 			if (!STAILQ_EMPTY(&swi_sc[i])) {
 				printf("%s: swi_sc[%d] active\n", __func__, i);
-				EPAIR_UNLOCK();
+				EPAIR_WUNLOCK();
 				return (EBUSY);
 			}
 		}
-		EPAIR_UNLOCK();
+		EPAIR_WUNLOCK();
 		for (i = 0; i < MAXCPU; i++)
 			if (swi_cookie[i] != NULL)
 				(void) swi_remove(swi_cookie[i]);
