@@ -2389,8 +2389,11 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else {
+			VXLAN_WLOCK(sc);
 			sc->vxl_fibnum = ifr->ifr_fib;
+			VXLAN_WUNLOCK(sc);
+		}
 		break;
 
 	default:
