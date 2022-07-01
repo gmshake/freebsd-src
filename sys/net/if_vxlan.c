@@ -2330,6 +2330,7 @@ vxlan_ioctl_drvspec(struct vxlan_softc *sc, struct ifdrv *ifd, int get)
 static int
 vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
+	struct rm_priotracker tracker;
 	struct vxlan_softc *sc;
 	struct ifreq *ifr;
 	struct ifdrv *ifd;
@@ -2380,7 +2381,9 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGTUNFIB:
+		VXLAN_RLOCK(sc, &tracker);
 		ifr->ifr_fib = sc->vxl_fibnum;
+		VXLAN_RUNLOCK(sc, &tracker);
 		break;
 
 	case SIOCSTUNFIB:
@@ -2737,10 +2740,10 @@ vxlan_transmit(struct ifnet *ifp, struct mbuf *m)
 	fe = NULL;
 	mcifp = NULL;
 
-	M_SETFIB(m, sc->vxl_fibnum);
 	ETHER_BPF_MTAP(ifp, m);
 
 	VXLAN_RLOCK(sc, &tracker);
+	M_SETFIB(m, sc->vxl_fibnum);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		VXLAN_RUNLOCK(sc, &tracker);
 		m_freem(m);
