@@ -82,6 +82,129 @@ __FBSDID("$FreeBSD$");
 struct vxlan_softc;
 LIST_HEAD(vxlan_softc_head, vxlan_softc);
 
+#ifndef VXLAN_HASH_SIZE
+#define VXLAN_HASH_SIZE (1 << 4)
+#endif
+
+#ifdef INET
+static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
+static struct vxlan_softc_head *ipv4_srchashtbl = NULL;
+#define VXLAN_SRCHASH4(src)	(ipv4_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+
+/*
+ * Check that ingress address belongs to local host.
+ */
+static void
+in_vxlan_set_running(struct vxlan_softc *sc)
+{
+	struct ifnet *ifp
+
+	ifp = sc->vxl_ifp;
+
+	if (in_localip(sc->vxl_src_addr.in4.sin_addr) && \
+            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		vxlan_init(sc);
+	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		vxlan_teardown(sc);
+}
+
+/*
+ * ifaddr_event handler.
+ * Clear IFF_DRV_RUNNING flag when ingress address disappears to prevent
+ * source address spoofing.
+ */
+static void
+in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
+	int event __unused)
+{
+	const struct sockaddr_in *sin;
+	struct vxlan_softc *sc;
+
+	if (ipv4_srchashtbl == NULL)
+		return;
+
+	MPASS(in_epoch(net_epoch_preempt));
+	sin = (const struct sockaddr_in *)sa;
+	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
+		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) || \
+                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
+			continue;
+		in_vxlan_set_running(sc);
+	}
+}
+#endif
+
+#ifdef INET6
+static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
+static struct vxlan_softc_head *ipv6_srchashtbl = NULL;
+#define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+
+/*
+ * Check that ingress address belongs to local host.
+ */
+static void
+in6_vxlan_set_running(struct vxlan_softc *sc)
+{
+	struct ifnet *ifp
+
+	ifp = sc->vxl_ifp;
+
+	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr) && \
+            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		vxlan_init(sc);
+	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		vxlan_teardown(sc);
+}
+
+/*
+ * ifaddr_event handler.
+ */
+static void
+in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
+	int event __unused)
+{
+	const struct sockaddr_in6 *sin6;
+	struct vxlan_softc *sc;
+
+	if (ipv6_srchashtbl == NULL)
+		return;
+
+	MPASS(in_epoch(net_epoch_preempt));
+	sin6 = (const struct sockaddr_in6 *)sa;
+	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(sin6->sin6_addr), srchash) {
+		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
+                    IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
+			continue;
+		in6_vxlan_set_running(sc);
+	}
+}
+#endif
+
+#if defined(INET) || defined(INET6)
+static struct vxlan_softc_head *
+vxlan_hashinit(void)
+{
+	struct vxlan_softc_head *hash;
+	int i;
+
+	hash = malloc(sizeof(struct vxlan_softc_head) * VXLAN_HASH_SIZE,
+		M_VXLAN, M_WAITOK);
+	for (i = 0; i < VXLAN_HASH_SIZE; i++)
+		CK_LIST_INIT(&hash[i]);
+
+	return (hash);
+}
+
+static void
+vxlan_hashdestroy(struct vxlan_softc_head *hash)
+{
+	free(hash, M_VXLAN);
+}
+
+#endif
+
 struct sx vxlan_sx;
 SX_SYSINIT(vxlan, &vxlan_sx, "VXLAN global start/stop lock");
 
@@ -208,6 +331,7 @@ struct vxlan_softc {
 	char				 vxl_mc_ifname[IFNAMSIZ];
 	LIST_ENTRY(vxlan_softc)		 vxl_entry;
 	LIST_ENTRY(vxlan_softc)		 vxl_ifdetach_list;
+	CK_LIST_ENTRY(vxlan_softc)		 srchash;
 
 	/* For rate limiting errors on the tx fast path. */
 	struct timeval err_time;
@@ -1804,6 +1928,8 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	VXLAN_LOCK_WASSERT(sc);
 	MPASS(sc->vxl_flags & VXLAN_FLAG_TEARDOWN);
 
+	CK_LIST_REMOVE(sc, srchash)
+
 	ifp = sc->vxl_ifp;
 	ifp->if_flags &= ~IFF_UP;
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -1897,6 +2023,14 @@ vxlan_ioctl_ifflags(struct vxlan_softc *sc)
 	ifp = sc->vxl_ifp;
 
 	if (ifp->if_flags & IFF_UP) {
+#ifdef INET
+		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr))
+			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
+#endif
+#ifdef INET6
+		if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr))
+			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(&sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
+#endif
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 			vxlan_init(sc);
 	} else {
@@ -1986,6 +2120,7 @@ vxlan_ctrl_set_local_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		CK_LIST_REMOVE(sc, srchash);
 		vxlan_sockaddr_in_copy(&sc->vxl_src_addr, &vxlsa->sa);
 		vxlan_set_hwcaps(sc);
 		error = 0;
@@ -3641,12 +3776,29 @@ vxlan_load(void)
 	    vxlan_ifdetach_event, NULL, EVENTHANDLER_PRI_ANY);
 	vxlan_cloner = if_clone_simple(vxlan_name, vxlan_clone_create,
 	    vxlan_clone_destroy, 0);
+#ifdef INET
+	ipv4_srcaddrtab = ip_encap_register_srcaddr(in_vxlan_srcaddr,
+            NULL, M_WAITOK);
+	ipv4_hashtbl = vxlan_hashinit();
+#endif
+#ifdef INET6
+	ipv6_srcaddrtab = ip6_encap_register_srcaddr(in6_vxlan_srcaddr,
+            NULL, M_WAITOK);
+	ipv6_hashtbl = vxlan_hashinit();
+#endif
 }
 
 static void
 vxlan_unload(void)
 {
-
+#ifdef INET6
+	ip6_encap_unregister_srcaddr(ipv6_srcaddrtab);
+	vxlan_hashdestroy(ipv6_hashtbl);
+#endif
+#ifdef INET
+	ip_encap_unregister_srcaddr(ipv4_srcaddrtab);
+	vxlan_hashdestroy(ipv4_hashtbl);
+#endif
 	EVENTHANDLER_DEREGISTER(ifnet_departure_event,
 	    vxlan_ifdetach_event_tag);
 	if_clone_detach(vxlan_cloner);
