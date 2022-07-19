@@ -236,6 +236,24 @@ struct vxlan_softc {
 #define	satoconstsin(sa)	((const struct sockaddr_in *)(sa))
 #define	satoconstsin6(sa)	((const struct sockaddr_in6 *)(sa))
 
+#ifndef VXLAN_HASH_SIZE
+#define VXLAN_HASH_SIZE (1 << 4)
+#endif
+
+#ifdef INET
+static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
+static struct vxlan_list *ipv4_srchashtbl = NULL;
+#define VXLAN_SRCHASH4(src)	(ipv4_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+#endif
+
+#ifdef INET6
+static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
+static struct vxlan_list *ipv6_srchashtbl = NULL;
+#define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+#endif
+
 struct vxlanudphdr {
 	struct udphdr		vxlh_udp;
 	struct vxlan_header	vxlh_hdr;
@@ -1806,7 +1824,7 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	VXLAN_LOCK_WASSERT(sc);
 	MPASS(sc->vxl_flags & VXLAN_FLAG_TEARDOWN);
 
-	CK_LIST_REMOVE(sc, srchash)
+	CK_LIST_REMOVE(sc, srchash);
 
 	ifp = sc->vxl_ifp;
 	ifp->if_flags &= ~IFF_UP;
@@ -3644,16 +3662,7 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 	}
 }
 
-#ifndef VXLAN_HASH_SIZE
-#define VXLAN_HASH_SIZE (1 << 4)
-#endif
-
 #ifdef INET
-static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
-static struct vxlan_list *ipv4_srchashtbl = NULL;
-#define VXLAN_SRCHASH4(src)	(ipv4_srchashtbl[\
-	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
-
 /*
  * Check that ingress address belongs to local host.
  */
@@ -3698,11 +3707,6 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 #endif
 
 #ifdef INET6
-static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
-static struct vxlan_list *ipv6_srchashtbl = NULL;
-#define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
-	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
-
 /*
  * Check that ingress address belongs to local host.
  */
