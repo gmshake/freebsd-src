@@ -83,129 +83,6 @@ struct vxlan_softc;
 LIST_HEAD(vxlan_softc_head, vxlan_softc);
 CK_LIST_HEAD(vxlan_list, vxlan_softc);
 
-#ifndef VXLAN_HASH_SIZE
-#define VXLAN_HASH_SIZE (1 << 4)
-#endif
-
-#ifdef INET
-static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
-static struct vxlan_list *ipv4_srchashtbl = NULL;
-#define VXLAN_SRCHASH4(src)	(ipv4_srchashtbl[\
-	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
-
-/*
- * Check that ingress address belongs to local host.
- */
-static void
-in_vxlan_set_running(struct vxlan_softc *sc)
-{
-	struct ifnet *ifp;
-
-	ifp = sc->vxl_ifp;
-
-	if (in_localip(sc->vxl_src_addr.in4.sin_addr) && \
-            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
-		vxlan_init(sc);
-	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
-		vxlan_teardown(sc);
-}
-
-/*
- * ifaddr_event handler.
- * Clear IFF_DRV_RUNNING flag when ingress address disappears to prevent
- * source address spoofing.
- */
-static void
-in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
-	int event __unused)
-{
-	const struct sockaddr_in *sin;
-	struct vxlan_softc *sc;
-
-	if (ipv4_srchashtbl == NULL)
-		return;
-
-	MPASS(in_epoch(net_epoch_preempt));
-	sin = (const struct sockaddr_in *)sa;
-	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
-		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) || \
-                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
-			continue;
-		in_vxlan_set_running(sc);
-	}
-}
-#endif
-
-#ifdef INET6
-static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
-static struct vxlan_list *ipv6_srchashtbl = NULL;
-#define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
-	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
-
-/*
- * Check that ingress address belongs to local host.
- */
-static void
-in6_vxlan_set_running(struct vxlan_softc *sc)
-{
-	struct ifnet *ifp;
-
-	ifp = sc->vxl_ifp;
-
-	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr) && \
-            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
-		vxlan_init(sc);
-	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
-		vxlan_teardown(sc);
-}
-
-/*
- * ifaddr_event handler.
- */
-static void
-in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
-	int event __unused)
-{
-	const struct sockaddr_in6 *sin6;
-	struct vxlan_softc *sc;
-
-	if (ipv6_srchashtbl == NULL)
-		return;
-
-	MPASS(in_epoch(net_epoch_preempt));
-	sin6 = (const struct sockaddr_in6 *)sa;
-	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(sin6->sin6_addr), srchash) {
-		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
-                    IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
-			continue;
-		in6_vxlan_set_running(sc);
-	}
-}
-#endif
-
-#if defined(INET) || defined(INET6)
-static struct vxlan_list *
-vxlan_hashinit(void)
-{
-	struct vxlan_list *hash;
-	int i;
-
-	hash = malloc(sizeof(struct vxlan_list) * VXLAN_HASH_SIZE,
-		M_VXLAN, M_WAITOK);
-	for (i = 0; i < VXLAN_HASH_SIZE; i++)
-		CK_LIST_INIT(&hash[i]);
-
-	return (hash);
-}
-
-static void
-vxlan_hashdestroy(struct vxlan_list *hash)
-{
-	free(hash, M_VXLAN);
-}
-
-#endif
-
 struct sx vxlan_sx;
 SX_SYSINIT(vxlan, &vxlan_sx, "VXLAN global start/stop lock");
 
@@ -3766,6 +3643,129 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 		sx_xunlock(&vxlan_sx);
 	}
 }
+
+#ifndef VXLAN_HASH_SIZE
+#define VXLAN_HASH_SIZE (1 << 4)
+#endif
+
+#ifdef INET
+static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
+static struct vxlan_list *ipv4_srchashtbl = NULL;
+#define VXLAN_SRCHASH4(src)	(ipv4_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+
+/*
+ * Check that ingress address belongs to local host.
+ */
+static void
+in_vxlan_set_running(struct vxlan_softc *sc)
+{
+	struct ifnet *ifp;
+
+	ifp = sc->vxl_ifp;
+
+	if (in_localip(sc->vxl_src_addr.in4.sin_addr) && \
+            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		vxlan_init(sc);
+	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		vxlan_teardown(sc);
+}
+
+/*
+ * ifaddr_event handler.
+ * Clear IFF_DRV_RUNNING flag when ingress address disappears to prevent
+ * source address spoofing.
+ */
+static void
+in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
+	int event __unused)
+{
+	const struct sockaddr_in *sin;
+	struct vxlan_softc *sc;
+
+	if (ipv4_srchashtbl == NULL)
+		return;
+
+	MPASS(in_epoch(net_epoch_preempt));
+	sin = (const struct sockaddr_in *)sa;
+	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
+		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) || \
+                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
+			continue;
+		in_vxlan_set_running(sc);
+	}
+}
+#endif
+
+#ifdef INET6
+static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
+static struct vxlan_list *ipv6_srchashtbl = NULL;
+#define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
+	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+
+/*
+ * Check that ingress address belongs to local host.
+ */
+static void
+in6_vxlan_set_running(struct vxlan_softc *sc)
+{
+	struct ifnet *ifp;
+
+	ifp = sc->vxl_ifp;
+
+	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr) && \
+            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		vxlan_init(sc);
+	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		vxlan_teardown(sc);
+}
+
+/*
+ * ifaddr_event handler.
+ */
+static void
+in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
+	int event __unused)
+{
+	const struct sockaddr_in6 *sin6;
+	struct vxlan_softc *sc;
+
+	if (ipv6_srchashtbl == NULL)
+		return;
+
+	MPASS(in_epoch(net_epoch_preempt));
+	sin6 = (const struct sockaddr_in6 *)sa;
+	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(sin6->sin6_addr), srchash) {
+		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
+                    IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
+			continue;
+		in6_vxlan_set_running(sc);
+	}
+}
+#endif
+
+#if defined(INET) || defined(INET6)
+static struct vxlan_list *
+vxlan_hashinit(void)
+{
+	struct vxlan_list *hash;
+	int i;
+
+	hash = malloc(sizeof(struct vxlan_list) * VXLAN_HASH_SIZE,
+		M_VXLAN, M_WAITOK);
+	for (i = 0; i < VXLAN_HASH_SIZE; i++)
+		CK_LIST_INIT(&hash[i]);
+
+	return (hash);
+}
+
+static void
+vxlan_hashdestroy(struct vxlan_list *hash)
+{
+	free(hash, M_VXLAN);
+}
+
+#endif
 
 static void
 vxlan_load(void)
