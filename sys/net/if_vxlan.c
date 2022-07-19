@@ -3740,7 +3740,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 
 	MPASS(in_epoch(net_epoch_preempt));
 	sin6 = (const struct sockaddr_in6 *)sa;
-	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(sin6->sin6_addr), srchash) {
+	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
 		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
                     IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
 			continue;
