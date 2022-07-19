@@ -99,7 +99,7 @@ static struct vxlan_list *ipv4_srchashtbl = NULL;
 static void
 in_vxlan_set_running(struct vxlan_softc *sc)
 {
-	struct ifnet *ifp
+	struct ifnet *ifp;
 
 	ifp = sc->vxl_ifp;
 
@@ -148,7 +148,7 @@ static struct vxlan_list *ipv6_srchashtbl = NULL;
 static void
 in6_vxlan_set_running(struct vxlan_softc *sc)
 {
-	struct ifnet *ifp
+	struct ifnet *ifp;
 
 	ifp = sc->vxl_ifp;
 
