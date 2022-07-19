@@ -252,7 +252,7 @@ static struct vxlan_list *ipv4_srchashtbl = NULL;
 static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
 static struct vxlan_list *ipv6_srchashtbl = NULL;
 #define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
-	fnv_32_buf((src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+	fnv_32_buf((src), sizeof(*src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
 #endif
 
 struct vxlanudphdr {
