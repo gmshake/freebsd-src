@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip.h>
+#include <netinet/ip_encap.h>
 #include <netinet/ip6.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
