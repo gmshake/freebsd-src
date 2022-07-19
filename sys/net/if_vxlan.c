@@ -251,7 +251,7 @@ static struct vxlan_list *ipv4_srchashtbl = NULL;
 static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
 static struct vxlan_list *ipv6_srchashtbl = NULL;
 #define VXLAN_SRCHASH6(src)	(ipv6_srchashtbl[\
-	fnv_32_buf(&(src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
+	fnv_32_buf((src), sizeof(src), FNV1_32_INIT) & (VXLAN_HASH_SIZE - 1)])
 #endif
 
 struct vxlanudphdr {
@@ -3784,12 +3784,12 @@ vxlan_load(void)
 #ifdef INET
 	ipv4_srcaddrtab = ip_encap_register_srcaddr(in_vxlan_srcaddr,
             NULL, M_WAITOK);
-	ipv4_hashtbl = vxlan_hashinit();
+	ipv4_srchashtbl = vxlan_hashinit();
 #endif
 #ifdef INET6
 	ipv6_srcaddrtab = ip6_encap_register_srcaddr(in6_vxlan_srcaddr,
             NULL, M_WAITOK);
-	ipv6_hashtbl = vxlan_hashinit();
+	ipv6_srchashtbl = vxlan_hashinit();
 #endif
 }
 
@@ -3798,11 +3798,11 @@ vxlan_unload(void)
 {
 #ifdef INET6
 	ip6_encap_unregister_srcaddr(ipv6_srcaddrtab);
-	vxlan_hashdestroy(ipv6_hashtbl);
+	vxlan_hashdestroy(ipv6_srchashtbl);
 #endif
 #ifdef INET
 	ip_encap_unregister_srcaddr(ipv4_srcaddrtab);
-	vxlan_hashdestroy(ipv4_hashtbl);
+	vxlan_hashdestroy(ipv4_srchashtbl);
 #endif
 	EVENTHANDLER_DEREGISTER(ifnet_departure_event,
 	    vxlan_ifdetach_event_tag);
