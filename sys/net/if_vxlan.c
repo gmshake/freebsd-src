@@ -908,7 +908,7 @@ vxlan_socket_alloc(const union vxlan_sockaddr *sa)
 	struct vxlan_socket *vso;
 	int i;
 
-	vso = malloc(sizeof(*vso), M_VXLAN, M_ZERO);
+	vso = malloc(sizeof(*vso), M_VXLAN, M_NOWAIT | M_ZERO);
 	if (vso != NULL) {
 		rm_init(&vso->vxlso_lock, "vxlansorm");
 		refcount_init(&vso->vxlso_refcnt, 0);
