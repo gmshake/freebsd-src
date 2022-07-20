@@ -1665,7 +1665,7 @@ static void
 vxlan_set_family(struct vxlan_softc *sc)
 {
 	struct ifnet *ifp = sc->vxl_ifp;
-	if_printf(ifp, "vxlan_set_family: start");
+	if_printf(ifp, "vxlan_set_family: start ...\n");
 	if (vxlan_check_vni(sc->vxl_vni) != 0)
 		goto fail;
 
@@ -1698,11 +1698,12 @@ vxlan_set_family(struct vxlan_softc *sc)
 		else
 			goto fail;
 
-		if_printf(ifp, "vxlan_set_family: %s", sc->vxl_family == AF_INET ? "AF_INET" : "AF_INET6");
+		if_printf(ifp, "vxlan_set_family: %s\n", sc->vxl_family == AF_INET ? "AF_INET" : "AF_INET6");
+		return;
 	}
 
 fail:
-	if_printf(ifp, "vxlan_set_family: failed");
+	if_printf(ifp, "vxlan_set_family: failed!\n");
 	return;
 }
 
@@ -1792,7 +1793,7 @@ vxlan_init(void *xsc)
 	sc = xsc;
 	ifp = sc->vxl_ifp;
 
-	if_printf(ifp, "vxlan_init: %s", ifp->if_xname);
+	if_printf(ifp, "vxlan_init\n");
 
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
@@ -1916,7 +1917,7 @@ static void
 vxlan_teardown(struct vxlan_softc *sc)
 {
 
-	if_printf(sc->vxl_ifp, "vxlan_teardown: %s", sc->vxl_ifp->if_xname);
+	if_printf(sc->vxl_ifp, "vxlan_teardown\n");
 
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
@@ -1936,6 +1937,8 @@ static void
 vxlan_ifdetach(struct vxlan_softc *sc, struct ifnet *ifp,
     struct vxlan_softc_head *list)
 {
+
+	if_printf(ifp, "vxlan_ifdetach\n");
 
 	VXLAN_WLOCK(sc);
 
@@ -3772,16 +3775,19 @@ in_vxlan_set_running(struct vxlan_softc *sc)
 
 	ifp = sc->vxl_ifp;
 
-	if_printf(ifp, "in_vxlan_set_running: %s", ifp->if_xname);
+	if_printf(ifp, "in_vxlan_set_running ...\n");
 
 	VXLAN_RLOCK(sc, &tracker);
 	addr = sc->vxl_src_addr.in4.sin_addr;
 	VXLAN_RUNLOCK(sc, &tracker);
 
+
 	if (in_localip(addr))
 		vxlan_init(sc);
 	else
 		vxlan_teardown(sc);
+
+	if_printf(ifp, "in_vxlan_set_running done!\n");
 }
 
 /*
