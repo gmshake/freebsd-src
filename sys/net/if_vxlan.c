@@ -908,12 +908,14 @@ vxlan_socket_alloc(const union vxlan_sockaddr *sa)
 	struct vxlan_socket *vso;
 	int i;
 
-	vso = malloc(sizeof(*vso), M_VXLAN, M_WAITOK | M_ZERO);
-	rm_init(&vso->vxlso_lock, "vxlansorm");
-	refcount_init(&vso->vxlso_refcnt, 0);
-	for (i = 0; i < VXLAN_SO_VNI_HASH_SIZE; i++)
-		LIST_INIT(&vso->vxlso_vni_hash[i]);
-	vso->vxlso_laddr = *sa;
+	vso = malloc(sizeof(*vso), M_VXLAN, M_ZERO);
+	if (vso != NULL) {
+		rm_init(&vso->vxlso_lock, "vxlansorm");
+		refcount_init(&vso->vxlso_refcnt, 0);
+		for (i = 0; i < VXLAN_SO_VNI_HASH_SIZE; i++)
+			LIST_INIT(&vso->vxlso_vni_hash[i]);
+		vso->vxlso_laddr = *sa;
+	}
 
 	return (vso);
 }
@@ -3815,12 +3817,13 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
 		VXLAN_RLOCK(sc, &tracker);
-		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr: check interface %s", sc->vxl_ifp->if_xname);
+		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr\n");
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
                     sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
 			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
 		}
+		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found!\n");
 		VXLAN_RUNLOCK(sc, &tracker);
 		in_vxlan_set_running(sc);
 	}
