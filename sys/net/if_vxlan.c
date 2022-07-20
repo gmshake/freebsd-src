@@ -1963,14 +1963,6 @@ vxlan_ioctl_ifflags(struct vxlan_softc *sc)
 	ifp = sc->vxl_ifp;
 
 	if (ifp->if_flags & IFF_UP) {
-#ifdef INET
-		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr))
-			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
-#endif
-#ifdef INET6
-		if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr))
-			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(&sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
-#endif
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 			vxlan_init(sc);
 	} else {
