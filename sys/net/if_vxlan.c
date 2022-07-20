@@ -2021,11 +2021,11 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_ASSERT(sc);
 
+#if defined(INET) || defined(INET6)
 	if (sc->vxl_family != 0) {
-#if definded(INET) || definded(INET6)
 		CK_LIST_REMOVE(sc, srchash);
-#endif
 	}
+#endif
 }
 
 static void
