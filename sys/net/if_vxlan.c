@@ -1664,6 +1664,8 @@ vxlan_setup_interface_hdrlen(struct vxlan_softc *sc)
 static void
 vxlan_set_family(struct vxlan_softc *sc)
 {
+	struct ifnet *ifp = sc->vxl_ifp;
+	if_printf(ifp, "vxlan_set_family: start");
 	if (vxlan_check_vni(sc->vxl_vni) != 0)
 		goto fail;
 
@@ -1693,11 +1695,14 @@ vxlan_set_family(struct vxlan_softc *sc)
 		else if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) &&
 		    VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_dst_addr))
 			sc->vxl_family = AF_INET6;
+		else
+			goto fail;
 
-		goto fail;
+		if_printf(ifp, "vxlan_set_family: %s", sc->vxl_family == AF_INET ? "AF_INET" : "AF_INET6");
 	}
 
 fail:
+	if_printf(ifp, "vxlan_set_family: failed");
 	return;
 }
 
@@ -1786,6 +1791,8 @@ vxlan_init(void *xsc)
 
 	sc = xsc;
 	ifp = sc->vxl_ifp;
+
+	if_printf(ifp, "vxlan_init: %s", ifp->if_xname);
 
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
@@ -1908,6 +1915,8 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 static void
 vxlan_teardown(struct vxlan_softc *sc)
 {
+
+	if_printf(sc->vxl_ifp, "vxlan_teardown: %s", sc->vxl_ifp->if_xname);
 
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
@@ -3757,14 +3766,21 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 static void
 in_vxlan_set_running(struct vxlan_softc *sc)
 {
+	struct rm_priotracker tracker;
 	struct ifnet *ifp;
+	struct in_addr addr;
 
 	ifp = sc->vxl_ifp;
 
-	if (in_localip(sc->vxl_src_addr.in4.sin_addr) && \
-            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	if_printf(ifp, "in_vxlan_set_running: %s", ifp->if_xname);
+
+	VXLAN_RLOCK(sc, &tracker);
+	addr = sc->vxl_src_addr.in4.sin_addr;
+	VXLAN_RUNLOCK(sc, &tracker);
+
+	if (in_localip(addr))
 		vxlan_init(sc);
-	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+	else
 		vxlan_teardown(sc);
 }
 
@@ -3777,6 +3793,7 @@ static void
 in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
+	struct rm_priotracker tracker;
 	const struct sockaddr_in *sin;
 	struct vxlan_softc *sc;
 
@@ -3786,9 +3803,14 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	MPASS(in_epoch(net_epoch_preempt));
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
-		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) || \
-                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
+		VXLAN_RLOCK(sc, &tracker);
+		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr: check interface %s", sc->vxl_ifp->if_xname);
+		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
+                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
+			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
+		}
+		VXLAN_RUNLOCK(sc, &tracker);
 		in_vxlan_set_running(sc);
 	}
 }
