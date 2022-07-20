@@ -1666,6 +1666,9 @@ vxlan_set_family(struct vxlan_softc *sc)
 {
 	struct ifnet *ifp = sc->vxl_ifp;
 	if_printf(ifp, "vxlan_set_family: start ...\n");
+
+	VXLAN_LOCK_WASSERT(sc);
+
 	if (vxlan_check_vni(sc->vxl_vni) != 0)
 		goto fail;
 
@@ -2035,7 +2038,7 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 static void
 vxlan_set_srchash(struct vxlan_softc *sc)
 {
-	VXLAN_LOCK_ASSERT(sc);
+	VXLAN_LOCK_WASSERT(sc);
 
 	if (sc->vxl_family != 0) {
 #ifdef INET
@@ -3185,9 +3188,6 @@ vxlan_set_user_config(struct vxlan_softc *sc, struct ifvxlanparam *vxlp)
 			sc->vxl_flags &= ~VXLAN_FLAG_LEARN;
 	}
 
-	vxlan_set_family(sc);
-	vxlan_set_srchash(sc);
-
 	return (0);
 }
 
@@ -3390,6 +3390,8 @@ vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 
 	VXLAN_WLOCK(sc);
 	vxlan_setup_interface_hdrlen(sc);
+	vxlan_set_family(sc);
+	vxlan_set_srchash(sc);
 	VXLAN_WUNLOCK(sc);
 
 	return (0);
