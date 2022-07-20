@@ -1690,12 +1690,10 @@ vxlan_set_family(struct vxlan_softc *sc)
 		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) &&
 		    VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_dst_addr))
 			sc->vxl_family = AF_INET;
-			return (AF_INET);
-		}
-		if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) &&
+		else if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) &&
 		    VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_dst_addr))
 			sc->vxl_family = AF_INET6;
-		}
+
 		goto fail;
 	}
 
