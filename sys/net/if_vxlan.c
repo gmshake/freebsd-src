@@ -3185,6 +3185,9 @@ vxlan_set_user_config(struct vxlan_softc *sc, struct ifvxlanparam *vxlp)
 			sc->vxl_flags &= ~VXLAN_FLAG_LEARN;
 	}
 
+	vxlan_set_family(sc);
+	vxlan_set_srchash(sc);
+
 	return (0);
 }
 
