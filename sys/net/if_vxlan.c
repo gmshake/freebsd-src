@@ -3833,15 +3833,19 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 
 	printf("vxlan: in_vxlan_srcaddr ...\n");
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
+		VXLAN_WLOCK(sc);
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr\n");
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
-                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
+                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
+			VXLAN_WUNLOCK(sc);
 			continue;
+		}
 
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found %p\n", sc);
+		VXLAN_WUNLOCK(sc);
 		in_vxlan_set_running(sc);
 	}
 	printf("vxlan: in_vxlan_srcaddr done!\n");
@@ -3859,11 +3863,14 @@ in6_vxlan_set_running(struct vxlan_softc *sc)
 
 	ifp = sc->vxl_ifp;
 
-	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr) && \
-            (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	if_printf(ifp, "in6_vxlan_set_running ...\n");
+
+	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr))
 		vxlan_init(sc);
-	else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+	else
 		vxlan_teardown(sc);
+
+	if_printf(ifp, "in6_vxlan_set_running done!\n");
 }
 
 /*
@@ -3879,7 +3886,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (ipv6_srchashtbl == NULL)
 		return;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	sin6 = (const struct sockaddr_in6 *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
 		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
