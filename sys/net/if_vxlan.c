@@ -212,6 +212,7 @@ struct vxlan_softc {
 	LIST_ENTRY(vxlan_softc)		 vxl_entry;
 	LIST_ENTRY(vxlan_softc)		 vxl_ifdetach_list;
 	CK_LIST_ENTRY(vxlan_softc)	 srchash;
+	int                              srchash_set;
 
 	/* For rate limiting errors on the tx fast path. */
 	struct timeval err_time;
@@ -1115,6 +1116,8 @@ vxlan_socket_ifdetach(struct vxlan_socket *vso, struct ifnet *ifp,
 	struct vxlan_softc *sc;
 	int i;
 
+	if_printf(ifp, "vxlan_socket_ifdetach\n");
+
 	VXLAN_SO_RLOCK(vso, &tracker);
 	for (i = 0; i < VXLAN_SO_VNI_HASH_SIZE; i++) {
 		LIST_FOREACH(sc, &vso->vxlso_vni_hash[i], vxl_entry)
@@ -1667,7 +1670,6 @@ static void
 vxlan_set_family(struct vxlan_softc *sc)
 {
 	struct ifnet *ifp = sc->vxl_ifp;
-	if_printf(ifp, "vxlan_set_family: start ...\n");
 
 	VXLAN_LOCK_WASSERT(sc);
 
@@ -1708,7 +1710,8 @@ vxlan_set_family(struct vxlan_softc *sc)
 	}
 
 fail:
-	if_printf(ifp, "vxlan_set_family: failed!\n");
+	sc->vxl_family = 0;
+	if_printf(ifp, "vxlan_set_family: failed, reset to 0 !\n");
 	return;
 }
 
@@ -1882,6 +1885,8 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	VXLAN_LOCK_WASSERT(sc);
 	MPASS(sc->vxl_flags & VXLAN_FLAG_TEARDOWN);
 
+	if_printf(sc->vxl_ifp, "vxlan_teardown_locked\n");
+
 	ifp = sc->vxl_ifp;
 	ifp->if_flags &= ~IFF_UP;
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -1953,6 +1958,7 @@ vxlan_ifdetach(struct vxlan_softc *sc, struct ifnet *ifp,
 		goto out;
 
 	vxlan_remove_srchash(sc);
+
 	sc->vxl_flags |= VXLAN_FLAG_TEARDOWN;
 	LIST_INSERT_HEAD(list, sc, vxl_ifdetach_list);
 
@@ -2030,11 +2036,16 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_ASSERT(sc);
 
+	if_printf(sc->vxl_ifp, "vxlan_remove_srchash ...\n");
+
+	if (sc->srchash_set != 0) {
 #if defined(INET) || defined(INET6)
-	if (sc->vxl_family != 0) {
 		CK_LIST_REMOVE(sc, srchash);
-	}
 #endif
+		sc->srchash_set = 0;
+
+		if_printf(sc->vxl_ifp, "vxlan_remove_srchash removed!\n");
+	}
 }
 
 static void
@@ -2042,7 +2053,9 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_WASSERT(sc);
 
-	if (sc->vxl_family != 0) {
+	if_printf(sc->vxl_ifp, "vxlan_set_srchash ...\n");
+
+	if (sc->srchash_set == 0 && sc->vxl_family != 0) {
 #ifdef INET
 		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr))
 			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
@@ -2051,6 +2064,8 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 		if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr))
 			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(&sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
 #endif
+		sc->srchash_set = 1;
+		if_printf(sc->vxl_ifp, "vxlan_set_srchash set!\n");
 	}
 
 }
@@ -2068,6 +2083,7 @@ vxlan_ctrl_set_vni(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_vni\n");
 		sc->vxl_vni = cmd->vxlcmd_vni;
 		if (sc->vxl_family == 0) {
 			vxlan_set_family(sc);
@@ -2103,6 +2119,7 @@ vxlan_ctrl_set_local_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_local_addr\n");
 		vxlan_remove_srchash(sc);
 		vxlan_sockaddr_in_copy(&sc->vxl_src_addr, &vxlsa->sa);
 		vxlan_set_hwcaps(sc);
@@ -2136,12 +2153,14 @@ vxlan_ctrl_set_remote_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_remote_addr\n");
 		vxlan_sockaddr_in_copy(&sc->vxl_dst_addr, &vxlsa->sa);
 		vxlan_setup_interface_hdrlen(sc);
-		if (sc->vxl_family == 0) {
-			vxlan_set_family(sc);
+		vxlan_set_family(sc);
+		if (sc->vxl_family == 0)
+			vxlan_remove_srchash(sc);
+		else
 			vxlan_set_srchash(sc);
-		}
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2163,11 +2182,13 @@ vxlan_ctrl_set_local_port(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_local_port\n");
 		sc->vxl_src_addr.in4.sin_port = htons(cmd->vxlcmd_port);
-		if (sc->vxl_family == 0) {
-			vxlan_set_family(sc);
+		vxlan_set_family(sc);
+		if (sc->vxl_family == 0)
+			vxlan_remove_srchash(sc);
+		else
 			vxlan_set_srchash(sc);
-		}
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2189,11 +2210,13 @@ vxlan_ctrl_set_remote_port(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
+		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_remote_port\n");
 		sc->vxl_dst_addr.in4.sin_port = htons(cmd->vxlcmd_port);
-		if (sc->vxl_family == 0) {
-			vxlan_set_family(sc);
+		vxlan_set_family(sc);
+		if (sc->vxl_family == 0)
+			vxlan_remove_srchash(sc);
+		else
 			vxlan_set_srchash(sc);
-		}
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2278,10 +2301,11 @@ vxlan_ctrl_set_multicast_if(struct vxlan_softc * sc, void *arg)
 	if (vxlan_can_change_config(sc)) {
 		strlcpy(sc->vxl_mc_ifname, cmd->vxlcmd_ifname, IFNAMSIZ);
 		vxlan_set_hwcaps(sc);
-		if (sc->vxl_family == 0) {
-			vxlan_set_family(sc);
+		vxlan_set_family(sc);
+		if (sc->vxl_family == 0)
+			vxlan_remove_srchash(sc);
+		else
 			vxlan_set_srchash(sc);
-		}
 		error = 0;
 	} else
 		error = EBUSY;
@@ -3752,6 +3776,8 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 	if ((ifp->if_flags & IFF_MULTICAST) == 0)
 		return;
 
+	if_printf(ifp, "vxlan_ifdetach_event\n");
+
 	VXLAN_LIST_LOCK();
 	LIST_FOREACH(vso, &vxlan_socket_list, vxlso_entry)
 		vxlan_socket_ifdetach(vso, ifp, &list);
@@ -3813,6 +3839,8 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (ipv4_srchashtbl == NULL)
 		return;
 
+	printf("vxlan: in_vxlan_srcaddr ...");
+
 	MPASS(in_epoch(net_epoch_preempt));
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
@@ -3823,10 +3851,11 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
 		}
-		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found!\n");
+		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found %p\n", sc);
 		VXLAN_RUNLOCK(sc, &tracker);
 		in_vxlan_set_running(sc);
 	}
+	printf("vxlan: in_vxlan_srcaddr done!");
 }
 #endif
 
