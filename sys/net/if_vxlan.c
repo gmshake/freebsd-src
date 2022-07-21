@@ -3839,7 +3839,7 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (ipv4_srchashtbl == NULL)
 		return;
 
-	printf("vxlan: in_vxlan_srcaddr ...");
+	printf("vxlan: in_vxlan_srcaddr ...\n");
 
 	MPASS(in_epoch(net_epoch_preempt));
 	sin = (const struct sockaddr_in *)sa;
@@ -3855,7 +3855,7 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 		VXLAN_RUNLOCK(sc, &tracker);
 		in_vxlan_set_running(sc);
 	}
-	printf("vxlan: in_vxlan_srcaddr done!");
+	printf("vxlan: in_vxlan_srcaddr done!\n");
 }
 #endif
 
