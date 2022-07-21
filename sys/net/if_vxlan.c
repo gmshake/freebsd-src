@@ -3802,20 +3802,13 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 static void
 in_vxlan_set_running(struct vxlan_softc *sc)
 {
-	struct rm_priotracker tracker;
 	struct ifnet *ifp;
-	struct in_addr addr;
 
 	ifp = sc->vxl_ifp;
 
 	if_printf(ifp, "in_vxlan_set_running ...\n");
 
-	VXLAN_RLOCK(sc, &tracker);
-	addr = sc->vxl_src_addr.in4.sin_addr;
-	VXLAN_RUNLOCK(sc, &tracker);
-
-
-	if (in_localip(addr))
+	if (in_localip(sc->vxl_src_addr.in4.sin_addr))
 		vxlan_init(sc);
 	else
 		vxlan_teardown(sc);
@@ -3832,7 +3825,6 @@ static void
 in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
-	struct rm_priotracker tracker;
 	const struct sockaddr_in *sin;
 	struct vxlan_softc *sc;
 
@@ -3844,15 +3836,12 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	MPASS(in_epoch(net_epoch_preempt));
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
-		VXLAN_RLOCK(sc, &tracker);
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr\n");
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
-                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
-			VXLAN_RUNLOCK(sc, &tracker);
+                    sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr)
 			continue;
-		}
+
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found %p\n", sc);
-		VXLAN_RUNLOCK(sc, &tracker);
 		in_vxlan_set_running(sc);
 	}
 	printf("vxlan: in_vxlan_srcaddr done!\n");
