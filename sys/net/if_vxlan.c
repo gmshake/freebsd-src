@@ -3802,7 +3802,7 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
  * Check that ingress address belongs to local host.
  */
 static void
-in_vxlan_set_running(struct vxlan_softc *sc)
+in_vxlan_set_running(struct vxlan_softc *sc, bool running)
 {
 	struct ifnet *ifp;
 
@@ -3810,9 +3810,11 @@ in_vxlan_set_running(struct vxlan_softc *sc)
 
 	if_printf(ifp, "in_vxlan_set_running ...\n");
 
-	if (in_localip(sc->vxl_src_addr.in4.sin_addr))
+	if (running)
+		// FIXME vxlan_setup_tunnel() ???
 		vxlan_init(sc);
 	else
+		// FIXME vxlan_delete_tunnel() ???
 		vxlan_teardown(sc);
 
 	if_printf(ifp, "in_vxlan_set_running done!\n");
@@ -3827,8 +3829,10 @@ static void
 in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
+	struct rm_priotracker tracker;
 	const struct sockaddr_in *sin;
 	struct vxlan_softc *sc;
+	bool running;
 
 	if (ipv4_srchashtbl == NULL)
 		return;
@@ -3838,17 +3842,18 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	NET_EPOCH_ASSERT();
 	sin = (const struct sockaddr_in *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
-		VXLAN_WLOCK(sc);
+		VXLAN_RLOCK(sc, &tracker);
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr\n");
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
                     sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
-			VXLAN_WUNLOCK(sc);
+			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
 		}
 
+		running = in_localip(sc->vxl_src_addr.in4.sin_addr);
 		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found %p\n", sc);
-		VXLAN_WUNLOCK(sc);
-		in_vxlan_set_running(sc);
+		VXLAN_RUNLOCK(sc, &tracker);
+		in_vxlan_set_running(sc, running);
 	}
 	printf("vxlan: in_vxlan_srcaddr done!\n");
 }
