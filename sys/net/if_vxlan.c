@@ -1957,8 +1957,6 @@ vxlan_ifdetach(struct vxlan_softc *sc, struct ifnet *ifp,
 	if (sc->vxl_flags & VXLAN_FLAG_TEARDOWN)
 		goto out;
 
-	vxlan_remove_srchash(sc);
-
 	sc->vxl_flags |= VXLAN_FLAG_TEARDOWN;
 	LIST_INSERT_HEAD(list, sc, vxl_ifdetach_list);
 
@@ -3890,14 +3888,16 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (ipv6_srchashtbl == NULL)
 		return;
 
+	printf("vxlan: in6_vxlan_srcaddr ...\n");
 	NET_EPOCH_ASSERT();
 	sin6 = (const struct sockaddr_in6 *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
-		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) || \
-                    IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
+		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) ||
+                    !IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
 			continue;
 		in6_vxlan_set_running(sc);
 	}
+	printf("vxlan: in6_vxlan_srcaddr done!\n");
 }
 #endif
 
