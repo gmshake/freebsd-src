@@ -3434,6 +3434,10 @@ vxlan_clone_destroy(struct ifnet *ifp)
 
 	sc = ifp->if_softc;
 
+	VXLAN_WLOCK(sc);
+	vxlan_remove_srchash(sc);
+	VXLAN_WUNLOCK(sc);
+
 	vxlan_teardown(sc);
 
 	vxlan_ftable_flush(sc, 1);
