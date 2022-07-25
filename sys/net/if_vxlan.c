@@ -909,7 +909,7 @@ vxlan_socket_alloc(const union vxlan_sockaddr *sa)
 	struct vxlan_socket *vso;
 	int i;
 
-	vso = malloc(sizeof(*vso), M_VXLAN, M_NOWAIT | M_ZERO);
+	vso = malloc(sizeof(*vso), M_VXLAN, M_ZERO | M_NOWAIT);
 	if (vso != NULL) {
 		rm_init(&vso->vxlso_lock, "vxlansorm");
 		refcount_init(&vso->vxlso_refcnt, 0);
@@ -1523,15 +1523,21 @@ vxlan_setup_multicast(struct vxlan_softc *sc)
 	 */
 	if (VXLAN_SOCKADDR_IS_IPV4(group)) {
 		sc->vxl_im4o = malloc(sizeof(struct ip_moptions), M_VXLAN,
-		    M_ZERO | M_WAITOK);
-		sc->vxl_im4o->imo_multicast_ifp = sc->vxl_mc_ifp;
-		sc->vxl_im4o->imo_multicast_ttl = sc->vxl_ttl;
-		sc->vxl_im4o->imo_multicast_vif = -1;
+		    M_ZERO | M_NOWAIT);
+		if (sc->vxl_im4o != NULL) {
+			sc->vxl_im4o->imo_multicast_ifp = sc->vxl_mc_ifp;
+			sc->vxl_im4o->imo_multicast_ttl = sc->vxl_ttl;
+			sc->vxl_im4o->imo_multicast_vif = -1;
+		} else
+			error = ENOMEM;
 	} else if (VXLAN_SOCKADDR_IS_IPV6(group)) {
 		sc->vxl_im6o = malloc(sizeof(struct ip6_moptions), M_VXLAN,
-		    M_ZERO | M_WAITOK);
-		sc->vxl_im6o->im6o_multicast_ifp = sc->vxl_mc_ifp;
-		sc->vxl_im6o->im6o_multicast_hlim = sc->vxl_ttl;
+		    M_ZERO | M_NOWAIT);
+		if (sc->vxl_im6o != NULL) {
+			sc->vxl_im6o->im6o_multicast_ifp = sc->vxl_mc_ifp;
+			sc->vxl_im6o->im6o_multicast_hlim = sc->vxl_ttl;
+		} else
+			error = ENOMEM;
 	}
 
 	return (error);
