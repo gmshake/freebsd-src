@@ -164,7 +164,6 @@ struct vxlan_statistics {
 
 struct vxlan_softc {
 	struct ifnet			*vxl_ifp;
-	int                              vxl_family;
 	int				 vxl_reqcap;
 	u_int				 vxl_fibnum;
 	struct vxlan_socket		*vxl_sock;
