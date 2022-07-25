@@ -3756,7 +3756,6 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 
 	NET_EPOCH_ASSERT();
 	sin = (const struct sockaddr_in *)sa;
-	running = in_localip(sin->sin_addr);
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
 		VXLAN_RLOCK(sc, &tracker);
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
@@ -3765,6 +3764,7 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 			continue;
 		}
 		VXLAN_RUNLOCK(sc, &tracker);
+		running = in_localip(sin->sin_addr);
 		vxlan_set_running(sc, running);
 	}
 }
@@ -3779,7 +3779,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
 	struct rm_priotracker tracker;
-	struct sockaddr_in6 *sin6;
+	const struct sockaddr_in6 *sin6;
 	struct vxlan_softc *sc;
 	bool running;
 
@@ -3787,8 +3787,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 		return;
 
 	NET_EPOCH_ASSERT();
-	sin6 = (struct sockaddr_in6 *)sa;
-	running = in6_localip(&sin6->sin6_addr);
+	sin6 = (const struct sockaddr_in6 *)sa;
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
 		VXLAN_RLOCK(sc, &tracker);
 		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) ||
@@ -3796,6 +3795,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
 		}
+		running = in6_localip(&sc->vxl_src_addr.in6.sin6_addr);
 		VXLAN_RUNLOCK(sc, &tracker);
 		vxlan_set_running(sc, running);
 	}
