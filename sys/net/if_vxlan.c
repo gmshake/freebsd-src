@@ -343,7 +343,7 @@ static int	vxlan_setup_socket(struct vxlan_softc *);
 static void	vxlan_setup_zero_checksum_port(struct vxlan_softc *);
 #endif
 static void	vxlan_setup_interface_hdrlen(struct vxlan_softc *);
-static void	vxlan_set_family(struct vxlan_softc *);
+static bool	vxlan_can_set_srchash(struct vxlan_softc *);
 static int	vxlan_valid_init_config(struct vxlan_softc *);
 static void	vxlan_init_wait(struct vxlan_softc *);
 static void	vxlan_init_complete(struct vxlan_softc *);
@@ -1664,51 +1664,27 @@ vxlan_setup_interface_hdrlen(struct vxlan_softc *sc)
 		ifp->if_mtu = ETHERMTU - ifp->if_hdrlen;
 }
 
-static void
-vxlan_set_family(struct vxlan_softc *sc)
+static bool
+vxlan_can_set_srchash(struct vxlan_softc *sc)
 {
-	struct ifnet *ifp = sc->vxl_ifp;
+	const struct sockaddr *sa;
+	bool valid;
 
-	VXLAN_LOCK_WASSERT(sc);
+	sa = &vxladdr->sa;
 
-	if (vxlan_check_vni(sc->vxl_vni) != 0)
-		goto fail;
-
-	if (vxlan_sockaddr_supported(&sc->vxl_src_addr, 1) == 0)
-		goto fail;
-
-	if (vxlan_sockaddr_supported(&sc->vxl_dst_addr, 0) == 0)
-		goto fail;
-
-	if (vxlan_sockaddr_in_any(&sc->vxl_dst_addr) != 0)
-		goto fail;
-
-	if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 0 &&
-	    sc->vxl_mc_ifname[0] != '\0')
-		goto fail;
-
-	if (sc->vxl_src_addr.in4.sin_port == 0)
-		goto fail;
-
-	if (sc->vxl_dst_addr.in4.sin_port == 0)
-		goto fail;
-
-	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) == 0) {
-		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) &&
-		    VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_dst_addr))
-			sc->vxl_family = AF_INET;
-		else if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) &&
-		    VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_dst_addr))
-			sc->vxl_family = AF_INET6;
-		else
-			goto fail;
-
-		return;
+	switch (sc->vxl_src_addr.sa.sa_family) {
+	case AF_INET:
+		valid = sc->vxl_src_addr.in4.sin_addr.s_addr != INADDR_ANY;
+		break;
+	case AF_INET6:
+		valid = !IN6_IS_ADDR_UNSPECIFIED(&sc->vxl_src_addr.in6.sin6_addr);
+		break;
+	default:
+		valid = false;
+		break;
 	}
 
-fail:
-	sc->vxl_family = 0;
-	return;
+	return valid;
 }
 
 static int
@@ -2034,7 +2010,7 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_WASSERT(sc);
 
-	if (sc->srchash_set == 0 && sc->vxl_family != 0) {
+	if (sc->srchash_set == 0 && vxlan_can_set_srchash(sc)) {
 #ifdef INET
 		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr))
 			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
@@ -2062,10 +2038,6 @@ vxlan_ctrl_set_vni(struct vxlan_softc *sc, void *arg)
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
 		sc->vxl_vni = cmd->vxlcmd_vni;
-		if (sc->vxl_family == 0) {
-			vxlan_set_family(sc);
-			vxlan_set_srchash(sc);
-		}
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2099,7 +2071,6 @@ vxlan_ctrl_set_local_addr(struct vxlan_softc *sc, void *arg)
 		vxlan_remove_srchash(sc);
 		vxlan_sockaddr_in_copy(&sc->vxl_src_addr, &vxlsa->sa);
 		vxlan_set_hwcaps(sc);
-		vxlan_set_family(sc);
 		vxlan_set_srchash(sc);
 		error = 0;
 	} else
@@ -2131,11 +2102,6 @@ vxlan_ctrl_set_remote_addr(struct vxlan_softc *sc, void *arg)
 	if (vxlan_can_change_config(sc)) {
 		vxlan_sockaddr_in_copy(&sc->vxl_dst_addr, &vxlsa->sa);
 		vxlan_setup_interface_hdrlen(sc);
-		vxlan_set_family(sc);
-		if (sc->vxl_family == 0)
-			vxlan_remove_srchash(sc);
-		else
-			vxlan_set_srchash(sc);
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2158,11 +2124,6 @@ vxlan_ctrl_set_local_port(struct vxlan_softc *sc, void *arg)
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
 		sc->vxl_src_addr.in4.sin_port = htons(cmd->vxlcmd_port);
-		vxlan_set_family(sc);
-		if (sc->vxl_family == 0)
-			vxlan_remove_srchash(sc);
-		else
-			vxlan_set_srchash(sc);
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2185,11 +2146,6 @@ vxlan_ctrl_set_remote_port(struct vxlan_softc *sc, void *arg)
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
 		sc->vxl_dst_addr.in4.sin_port = htons(cmd->vxlcmd_port);
-		vxlan_set_family(sc);
-		if (sc->vxl_family == 0)
-			vxlan_remove_srchash(sc);
-		else
-			vxlan_set_srchash(sc);
 		error = 0;
 	} else
 		error = EBUSY;
@@ -2274,11 +2230,6 @@ vxlan_ctrl_set_multicast_if(struct vxlan_softc * sc, void *arg)
 	if (vxlan_can_change_config(sc)) {
 		strlcpy(sc->vxl_mc_ifname, cmd->vxlcmd_ifname, IFNAMSIZ);
 		vxlan_set_hwcaps(sc);
-		vxlan_set_family(sc);
-		if (sc->vxl_family == 0)
-			vxlan_remove_srchash(sc);
-		else
-			vxlan_set_srchash(sc);
 		error = 0;
 	} else
 		error = EBUSY;
@@ -3389,7 +3340,6 @@ vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 
 	VXLAN_WLOCK(sc);
 	vxlan_setup_interface_hdrlen(sc);
-	vxlan_set_family(sc);
 	vxlan_set_srchash(sc);
 	VXLAN_WUNLOCK(sc);
 
