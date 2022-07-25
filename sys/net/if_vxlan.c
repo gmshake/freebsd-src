@@ -1116,8 +1116,6 @@ vxlan_socket_ifdetach(struct vxlan_socket *vso, struct ifnet *ifp,
 	struct vxlan_softc *sc;
 	int i;
 
-	if_printf(ifp, "vxlan_socket_ifdetach\n");
-
 	VXLAN_SO_RLOCK(vso, &tracker);
 	for (i = 0; i < VXLAN_SO_VNI_HASH_SIZE; i++) {
 		LIST_FOREACH(sc, &vso->vxlso_vni_hash[i], vxl_entry)
@@ -1705,13 +1703,11 @@ vxlan_set_family(struct vxlan_softc *sc)
 		else
 			goto fail;
 
-		if_printf(ifp, "vxlan_set_family: %s\n", sc->vxl_family == AF_INET ? "AF_INET" : "AF_INET6");
 		return;
 	}
 
 fail:
 	sc->vxl_family = 0;
-	if_printf(ifp, "vxlan_set_family: failed, reset to 0 !\n");
 	return;
 }
 
@@ -1801,8 +1797,6 @@ vxlan_init(void *xsc)
 	sc = xsc;
 	ifp = sc->vxl_ifp;
 
-	if_printf(ifp, "vxlan_init\n");
-
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
 	if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1885,8 +1879,6 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	VXLAN_LOCK_WASSERT(sc);
 	MPASS(sc->vxl_flags & VXLAN_FLAG_TEARDOWN);
 
-	if_printf(sc->vxl_ifp, "vxlan_teardown_locked\n");
-
 	ifp = sc->vxl_ifp;
 	ifp->if_flags &= ~IFF_UP;
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -1927,8 +1919,6 @@ static void
 vxlan_teardown(struct vxlan_softc *sc)
 {
 
-	if_printf(sc->vxl_ifp, "vxlan_teardown\n");
-
 	sx_xlock(&vxlan_sx);
 	VXLAN_WLOCK(sc);
 	if (sc->vxl_flags & VXLAN_FLAG_TEARDOWN) {
@@ -1947,9 +1937,6 @@ static void
 vxlan_ifdetach(struct vxlan_softc *sc, struct ifnet *ifp,
     struct vxlan_softc_head *list)
 {
-
-	if_printf(ifp, "vxlan_ifdetach\n");
-
 	VXLAN_WLOCK(sc);
 
 	if (sc->vxl_mc_ifp != ifp)
@@ -2034,15 +2021,11 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_ASSERT(sc);
 
-	if_printf(sc->vxl_ifp, "vxlan_remove_srchash ...\n");
-
 	if (sc->srchash_set != 0) {
 #if defined(INET) || defined(INET6)
 		CK_LIST_REMOVE(sc, srchash);
 #endif
 		sc->srchash_set = 0;
-
-		if_printf(sc->vxl_ifp, "vxlan_remove_srchash removed!\n");
 	}
 }
 
@@ -2050,8 +2033,6 @@ static void
 vxlan_set_srchash(struct vxlan_softc *sc)
 {
 	VXLAN_LOCK_WASSERT(sc);
-
-	if_printf(sc->vxl_ifp, "vxlan_set_srchash ...\n");
 
 	if (sc->srchash_set == 0 && sc->vxl_family != 0) {
 #ifdef INET
@@ -2063,7 +2044,6 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(&sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
 #endif
 		sc->srchash_set = 1;
-		if_printf(sc->vxl_ifp, "vxlan_set_srchash set!\n");
 	}
 
 }
@@ -2081,7 +2061,6 @@ vxlan_ctrl_set_vni(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_vni\n");
 		sc->vxl_vni = cmd->vxlcmd_vni;
 		if (sc->vxl_family == 0) {
 			vxlan_set_family(sc);
@@ -2117,7 +2096,6 @@ vxlan_ctrl_set_local_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_local_addr\n");
 		vxlan_remove_srchash(sc);
 		vxlan_sockaddr_in_copy(&sc->vxl_src_addr, &vxlsa->sa);
 		vxlan_set_hwcaps(sc);
@@ -2151,7 +2129,6 @@ vxlan_ctrl_set_remote_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_remote_addr\n");
 		vxlan_sockaddr_in_copy(&sc->vxl_dst_addr, &vxlsa->sa);
 		vxlan_setup_interface_hdrlen(sc);
 		vxlan_set_family(sc);
@@ -2180,7 +2157,6 @@ vxlan_ctrl_set_local_port(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_local_port\n");
 		sc->vxl_src_addr.in4.sin_port = htons(cmd->vxlcmd_port);
 		vxlan_set_family(sc);
 		if (sc->vxl_family == 0)
@@ -2208,7 +2184,6 @@ vxlan_ctrl_set_remote_port(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		if_printf(sc->vxl_ifp, "vxlan_ctrl_set_remote_port\n");
 		sc->vxl_dst_addr.in4.sin_port = htons(cmd->vxlcmd_port);
 		vxlan_set_family(sc);
 		if (sc->vxl_family == 0)
@@ -3778,8 +3753,6 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 	if ((ifp->if_flags & IFF_MULTICAST) == 0)
 		return;
 
-	if_printf(ifp, "vxlan_ifdetach_event\n");
-
 	VXLAN_LIST_LOCK();
 	LIST_FOREACH(vso, &vxlan_socket_list, vxlso_entry)
 		vxlan_socket_ifdetach(vso, ifp, &list);
@@ -3797,29 +3770,23 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 	}
 }
 
-#ifdef INET
+#if defined(INET) || defined(INET6)
 /*
  * Check that ingress address belongs to local host.
  */
 static void
-in_vxlan_set_running(struct vxlan_softc *sc, bool running)
+vxlan_set_running(struct vxlan_softc *sc, bool running)
 {
-	struct ifnet *ifp;
-
-	ifp = sc->vxl_ifp;
-
-	if_printf(ifp, "in_vxlan_set_running ...\n");
-
 	if (running)
 		// FIXME vxlan_setup_tunnel() ???
 		vxlan_init(sc);
 	else
 		// FIXME vxlan_delete_tunnel() ???
 		vxlan_teardown(sc);
-
-	if_printf(ifp, "in_vxlan_set_running done!\n");
 }
+#endif
 
+#ifdef INET
 /*
  * ifaddr_event handler.
  * Clear IFF_DRV_RUNNING flag when ingress address disappears to prevent
@@ -3837,49 +3804,23 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	if (ipv4_srchashtbl == NULL)
 		return;
 
-	printf("vxlan: in_vxlan_srcaddr ...\n");
-
 	NET_EPOCH_ASSERT();
 	sin = (const struct sockaddr_in *)sa;
+	running = in_localip(sin->sin_addr);
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH4(sin->sin_addr.s_addr), srchash) {
 		VXLAN_RLOCK(sc, &tracker);
-		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr\n");
 		if (!VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr) ||
                     sc->vxl_src_addr.in4.sin_addr.s_addr != sin->sin_addr.s_addr) {
 			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
 		}
-
-		running = in_localip(sc->vxl_src_addr.in4.sin_addr);
-		if_printf(sc->vxl_ifp, "in_vxlan_srcaddr, found %p\n", sc);
 		VXLAN_RUNLOCK(sc, &tracker);
-		in_vxlan_set_running(sc, running);
+		vxlan_set_running(sc, running);
 	}
-	printf("vxlan: in_vxlan_srcaddr done!\n");
 }
 #endif
 
 #ifdef INET6
-/*
- * Check that ingress address belongs to local host.
- */
-static void
-in6_vxlan_set_running(struct vxlan_softc *sc)
-{
-	struct ifnet *ifp;
-
-	ifp = sc->vxl_ifp;
-
-	if_printf(ifp, "in6_vxlan_set_running ...\n");
-
-	if (in6_localip(&sc->vxl_src_addr.in6.sin6_addr))
-		vxlan_init(sc);
-	else
-		vxlan_teardown(sc);
-
-	if_printf(ifp, "in6_vxlan_set_running done!\n");
-}
-
 /*
  * ifaddr_event handler.
  */
@@ -3887,22 +3828,27 @@ static void
 in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
+	struct rm_priotracker tracker;
 	const struct sockaddr_in6 *sin6;
 	struct vxlan_softc *sc;
+	bool running;
 
 	if (ipv6_srchashtbl == NULL)
 		return;
 
-	printf("vxlan: in6_vxlan_srcaddr ...\n");
 	NET_EPOCH_ASSERT();
 	sin6 = (const struct sockaddr_in6 *)sa;
+	running = in6_localip(&sin6->sin6_addr);
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
+		VXLAN_RLOCK(sc, &tracker);
 		if (!VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr) ||
-                    !IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr))
+                    !IN6_ARE_ADDR_EQUAL(&sc->vxl_src_addr.in6.sin6_addr, &sin6->sin6_addr)) {
+			VXLAN_RUNLOCK(sc, &tracker);
 			continue;
-		in6_vxlan_set_running(sc);
+		}
+		VXLAN_RUNLOCK(sc, &tracker);
+		vxlan_set_running(sc, running);
 	}
-	printf("vxlan: in6_vxlan_srcaddr done!\n");
 }
 #endif
 
