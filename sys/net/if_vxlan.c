@@ -1667,10 +1667,7 @@ vxlan_setup_interface_hdrlen(struct vxlan_softc *sc)
 static bool
 vxlan_can_set_srchash(struct vxlan_softc *sc)
 {
-	const struct sockaddr *sa;
 	bool valid;
-
-	sa = &vxladdr->sa;
 
 	switch (sc->vxl_src_addr.sa.sa_family) {
 	case AF_INET:
