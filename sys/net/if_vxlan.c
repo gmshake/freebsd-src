@@ -3779,7 +3779,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	int event __unused)
 {
 	struct rm_priotracker tracker;
-	const struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 	struct vxlan_softc *sc;
 	bool running;
 
@@ -3787,7 +3787,7 @@ in6_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 		return;
 
 	NET_EPOCH_ASSERT();
-	sin6 = (const struct sockaddr_in6 *)sa;
+	sin6 = (struct sockaddr_in6 *)sa;
 	running = in6_localip(&sin6->sin6_addr);
 	CK_LIST_FOREACH(sc, &VXLAN_SRCHASH6(&sin6->sin6_addr), srchash) {
 		VXLAN_RLOCK(sc, &tracker);
