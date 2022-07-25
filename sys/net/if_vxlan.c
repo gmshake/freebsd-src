@@ -3886,14 +3886,14 @@ vxlan_load(void)
 	vxlan_cloner = if_clone_simple(vxlan_name, vxlan_clone_create,
 	    vxlan_clone_destroy, 0);
 #ifdef INET
+	ipv4_srchashtbl = vxlan_hashinit();
 	ipv4_srcaddrtab = ip_encap_register_srcaddr(in_vxlan_srcaddr,
             NULL, M_WAITOK);
-	ipv4_srchashtbl = vxlan_hashinit();
 #endif
 #ifdef INET6
+	ipv6_srchashtbl = vxlan_hashinit();
 	ipv6_srcaddrtab = ip6_encap_register_srcaddr(in6_vxlan_srcaddr,
             NULL, M_WAITOK);
-	ipv6_srchashtbl = vxlan_hashinit();
 #endif
 }
 
@@ -3902,17 +3902,21 @@ vxlan_unload(void)
 {
 #ifdef INET6
 	ip6_encap_unregister_srcaddr(ipv6_srcaddrtab);
-	vxlan_hashdestroy(ipv6_srchashtbl);
 #endif
 #ifdef INET
 	ip_encap_unregister_srcaddr(ipv4_srcaddrtab);
-	vxlan_hashdestroy(ipv4_srchashtbl);
 #endif
 	EVENTHANDLER_DEREGISTER(ifnet_departure_event,
 	    vxlan_ifdetach_event_tag);
 	if_clone_detach(vxlan_cloner);
 	mtx_destroy(&vxlan_list_mtx);
 	MPASS(LIST_EMPTY(&vxlan_socket_list));
+#ifdef INET6
+	vxlan_hashdestroy(ipv6_srchashtbl);
+#endif
+#ifdef INET
+	vxlan_hashdestroy(ipv4_srchashtbl);
+#endif
 }
 
 static int
