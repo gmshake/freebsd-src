@@ -342,7 +342,6 @@ static int	vxlan_setup_socket(struct vxlan_softc *);
 static void	vxlan_setup_zero_checksum_port(struct vxlan_softc *);
 #endif
 static void	vxlan_setup_interface_hdrlen(struct vxlan_softc *);
-static bool	vxlan_can_set_srchash(struct vxlan_softc *);
 static int	vxlan_valid_init_config(struct vxlan_softc *);
 static void	vxlan_init_wait(struct vxlan_softc *);
 static void	vxlan_init_complete(struct vxlan_softc *);
@@ -1669,26 +1668,6 @@ vxlan_setup_interface_hdrlen(struct vxlan_softc *sc)
 		ifp->if_mtu = ETHERMTU - ifp->if_hdrlen;
 }
 
-static bool
-vxlan_can_set_srchash(struct vxlan_softc *sc)
-{
-	bool valid;
-
-	switch (sc->vxl_src_addr.sa.sa_family) {
-	case AF_INET:
-		valid = sc->vxl_src_addr.in4.sin_addr.s_addr != INADDR_ANY;
-		break;
-	case AF_INET6:
-		valid = !IN6_IS_ADDR_UNSPECIFIED(&sc->vxl_src_addr.in6.sin6_addr);
-		break;
-	default:
-		valid = false;
-		break;
-	}
-
-	return valid;
-}
-
 static int
 vxlan_valid_init_config(struct vxlan_softc *sc)
 {
@@ -1915,6 +1894,7 @@ static void
 vxlan_ifdetach(struct vxlan_softc *sc, struct ifnet *ifp,
     struct vxlan_softc_head *list)
 {
+
 	VXLAN_WLOCK(sc);
 
 	if (sc->vxl_mc_ifp != ifp)
@@ -2000,9 +1980,7 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 	VXLAN_LOCK_ASSERT(sc);
 
 	if (sc->srchash_set != 0) {
-#if defined(INET) || defined(INET6)
 		CK_LIST_REMOVE(sc, srchash);
-#endif
 		sc->srchash_set = 0;
 	}
 }
@@ -2010,18 +1988,33 @@ vxlan_remove_srchash(struct vxlan_softc *sc)
 static void
 vxlan_set_srchash(struct vxlan_softc *sc)
 {
+
 	VXLAN_LOCK_WASSERT(sc);
 
-	if (sc->srchash_set == 0 && vxlan_can_set_srchash(sc)) {
+	if (sc->srchash_set != 0)
+		return;
+
+	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) != 0)
+		return;
+
+	if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 1)
+		return;
+
+	switch (sc->vxl_src_addr.sa.sa_family) {
 #ifdef INET
-		if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr))
-			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
+	case AF_INET:
+		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(
+                    sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
+		sc->srchash_set = 1;
+		break;
 #endif
 #ifdef INET6
-		if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr))
-			CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(&sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
-#endif
+	case AF_INET6:
+		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(
+                    &sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
 		sc->srchash_set = 1;
+		break;
+#endif
 	}
 
 }
@@ -3864,9 +3857,17 @@ vxlan_unload(void)
 	mtx_destroy(&vxlan_list_mtx);
 	MPASS(LIST_EMPTY(&vxlan_socket_list));
 #ifdef INET6
+#ifdef INVARIANTS
+	for (int i = 0; i < VXLAN_HASH_SIZE; i++)
+		MPASS(CK_LIST_EMPTY(&ipv6_srchashtbl[i]));
+#endif
 	vxlan_hashdestroy(ipv6_srchashtbl);
 #endif
 #ifdef INET
+#ifdef INVARIANTS
+	for (int i = 0; i < VXLAN_HASH_SIZE; i++)
+		MPASS(CK_LIST_EMPTY(&ipv4_srchashtbl[i]));
+#endif
 	vxlan_hashdestroy(ipv4_srchashtbl);
 #endif
 }
