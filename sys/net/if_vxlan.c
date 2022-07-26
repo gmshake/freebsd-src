@@ -1997,9 +1997,6 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) != 0)
 		return;
 
-	if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 1)
-		return;
-
 	switch (sc->vxl_src_addr.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
