@@ -356,8 +356,6 @@ static void	vxlan_ifdetach(struct vxlan_softc *, struct ifnet *,
 static void	vxlan_timer(void *);
 
 static int	vxlan_ctrl_get_config(struct vxlan_softc *, void *);
-static void	vxlan_remove_srchash(struct vxlan_softc *);
-static void	vxlan_set_srchash(struct vxlan_softc *);
 static int	vxlan_ctrl_set_vni(struct vxlan_softc *, void *);
 static int	vxlan_ctrl_set_local_addr(struct vxlan_softc *, void *);
 static int	vxlan_ctrl_set_remote_addr(struct vxlan_softc *, void *);
@@ -429,6 +427,9 @@ static int	vxlan_check_ftable_max(uint32_t);
 static void	vxlan_sysctl_setup(struct vxlan_softc *);
 static void	vxlan_sysctl_destroy(struct vxlan_softc *);
 static int	vxlan_tunable_int(struct vxlan_softc *, const char *, int);
+
+static void	vxlan_remove_srchash(struct vxlan_softc *);
+static void	vxlan_set_srchash(struct vxlan_softc *);
 
 static void	vxlan_ifdetach_event(void *, struct ifnet *);
 static void	vxlan_load(void);
@@ -1978,48 +1979,6 @@ vxlan_ctrl_get_config(struct vxlan_softc *sc, void *arg)
 #endif
 
 	return (0);
-}
-
-static void
-vxlan_remove_srchash(struct vxlan_softc *sc)
-{
-	VXLAN_LOCK_ASSERT(sc);
-
-	if (sc->srchash_set != 0) {
-		CK_LIST_REMOVE(sc, srchash);
-		sc->srchash_set = 0;
-	}
-}
-
-static void
-vxlan_set_srchash(struct vxlan_softc *sc)
-{
-
-	VXLAN_LOCK_WASSERT(sc);
-
-	if (sc->srchash_set != 0)
-		return;
-
-	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) != 0)
-		return;
-
-	switch (sc->vxl_src_addr.sa.sa_family) {
-#ifdef INET
-	case AF_INET:
-		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(
-                    sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
-		sc->srchash_set = 1;
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(
-                    &sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
-		sc->srchash_set = 1;
-		break;
-#endif
-	}
-
 }
 
 static int
@@ -3715,6 +3674,46 @@ vxlan_ifdetach_event(void *arg __unused, struct ifnet *ifp)
 	}
 }
 
+static void
+vxlan_remove_srchash(struct vxlan_softc *sc)
+{
+	VXLAN_LOCK_ASSERT(sc);
+
+	if (sc->srchash_set != 0) {
+		CK_LIST_REMOVE(sc, srchash);
+		sc->srchash_set = 0;
+	}
+}
+
+static void
+vxlan_set_srchash(struct vxlan_softc *sc)
+{
+	VXLAN_LOCK_WASSERT(sc);
+
+	if (sc->srchash_set != 0)
+		return;
+
+	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) != 0)
+		return;
+
+	switch (sc->vxl_src_addr.sa.sa_family) {
+#ifdef INET
+	case AF_INET:
+		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH4(
+                    sc->vxl_src_addr.in4.sin_addr.s_addr), sc, srchash);
+		sc->srchash_set = 1;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		CK_LIST_INSERT_HEAD(&VXLAN_SRCHASH6(
+                    &sc->vxl_src_addr.in6.sin6_addr), sc, srchash);
+		sc->srchash_set = 1;
+		break;
+#endif
+	}
+}
+
 #if defined(INET) || defined(INET6)
 /*
  * Check that ingress address belongs to local host.
@@ -3844,6 +3843,7 @@ vxlan_load(void)
 static void
 vxlan_unload(void)
 {
+
 #ifdef INET6
 	ip6_encap_unregister_srcaddr(ipv6_srcaddrtab);
 #endif
