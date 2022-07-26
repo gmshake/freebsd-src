@@ -3696,6 +3696,19 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 	if (vxlan_sockaddr_in_any(&sc->vxl_src_addr) != 0)
 		return;
 
+	// FIXME panic: malloc(M_WAITOK) with sleeping prohibited
+	// inp_findmoptions	sys/netinet/in_mcast.c:1574
+	// inp_join_group	sys/netinet/in_mcast.c:2054
+	// inp_setmoptions	sys/netinet/in_mcast.c:2823
+	// vxlan_socket_mc_join_group	sys/net/if_vxlan.c:1185
+	// vxlan_setup_socket	sys/net/if_vxlan.c:1585
+	// vxlan_init		sys/net/if_vxlan.c:1771
+	// vxlan_set_running	sys/net/if_vxlan.c:3726
+	// in_vxlan_srcaddr	sys/net/if_vxlan.c:3762
+	// srcaddr_change_event	sys/netinet/ip_encap.c:179
+	if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 1)
+		return;
+
 	switch (sc->vxl_src_addr.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
