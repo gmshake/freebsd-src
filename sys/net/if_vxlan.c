@@ -1929,9 +1929,15 @@ vxlan_ioctl_ifflags(struct vxlan_softc *sc)
 	ifp = sc->vxl_ifp;
 
 	if (ifp->if_flags & IFF_UP) {
+		VXLAN_WLOCK(sc);
+		vxlan_set_srchash(sc);
+		VXLAN_WUNLOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 			vxlan_init(sc);
 	} else {
+		VXLAN_WLOCK(sc);
+		vxlan_remove_srchash(sc);
+		VXLAN_WUNLOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			vxlan_teardown(sc);
 	}
@@ -2060,10 +2066,8 @@ vxlan_ctrl_set_local_addr(struct vxlan_softc *sc, void *arg)
 
 	VXLAN_WLOCK(sc);
 	if (vxlan_can_change_config(sc)) {
-		vxlan_remove_srchash(sc);
 		vxlan_sockaddr_in_copy(&sc->vxl_src_addr, &vxlsa->sa);
 		vxlan_set_hwcaps(sc);
-		vxlan_set_srchash(sc);
 		error = 0;
 	} else
 		error = EBUSY;
@@ -3332,7 +3336,6 @@ vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 
 	VXLAN_WLOCK(sc);
 	vxlan_setup_interface_hdrlen(sc);
-	vxlan_set_srchash(sc);
 	VXLAN_WUNLOCK(sc);
 
 	return (0);
