@@ -3814,7 +3814,6 @@ vxlan_hashdestroy(struct vxlan_list *hash)
 {
 	free(hash, M_VXLAN);
 }
-
 #endif
 
 static void
@@ -3853,18 +3852,20 @@ vxlan_unload(void)
 	if_clone_detach(vxlan_cloner);
 	mtx_destroy(&vxlan_list_mtx);
 	MPASS(LIST_EMPTY(&vxlan_socket_list));
-#ifdef INET6
 #ifdef INVARIANTS
+#ifdef INET6
 	for (int i = 0; i < VXLAN_HASH_SIZE; i++)
 		MPASS(CK_LIST_EMPTY(&ipv6_srchashtbl[i]));
 #endif
-	vxlan_hashdestroy(ipv6_srchashtbl);
-#endif
 #ifdef INET
-#ifdef INVARIANTS
 	for (int i = 0; i < VXLAN_HASH_SIZE; i++)
 		MPASS(CK_LIST_EMPTY(&ipv4_srchashtbl[i]));
 #endif
+#endif
+#ifdef INET6
+	vxlan_hashdestroy(ipv6_srchashtbl);
+#endif
+#ifdef INET
 	vxlan_hashdestroy(ipv4_srchashtbl);
 #endif
 }
