@@ -3753,9 +3753,9 @@ vxlan_set_running_callback(epoch_context_t ctx)
 	bool running = false;
 
 	sc = __containerof(ctx, struct vxlan_softc, epoch_ctx);
+	VXLAN_RLOCK(sc, &tracker);
 	NET_EPOCH_ENTER(et);
 	CURVNET_SET(sc->vxl_ifp->if_vnet);
-	VXLAN_RLOCK(sc, &tracker);
 #ifdef INET
 	if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr)) {
 		running = in_localip(sc->vxl_src_addr.in4.sin_addr);
@@ -3766,9 +3766,9 @@ vxlan_set_running_callback(epoch_context_t ctx)
 		running = in6_localip(&sc->vxl_src_addr.in6.sin6_addr);
 	}
 #endif
-	VXLAN_RUNLOCK(sc, &tracker);
 	CURVNET_RESTORE();
 	NET_EPOCH_EXIT(et);
+	VXLAN_RUNLOCK(sc, &tracker);
 
 	vxlan_set_running(sc, running);
 }
