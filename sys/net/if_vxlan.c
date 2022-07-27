@@ -216,6 +216,8 @@ struct vxlan_softc {
 	/* For rate limiting errors on the tx fast path. */
 	struct timeval err_time;
 	int err_pps;
+
+	struct epoch_context		epoch_ctx;
 };
 
 #define VXLAN_RLOCK(_sc, _p)	rm_rlock(&(_sc)->vxl_lock, (_p))
@@ -3706,8 +3708,8 @@ vxlan_set_srchash(struct vxlan_softc *sc)
 	// vxlan_set_running	sys/net/if_vxlan.c:3726
 	// in_vxlan_srcaddr	sys/net/if_vxlan.c:3762
 	// srcaddr_change_event	sys/netinet/ip_encap.c:179
-	if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 1)
-		return;
+	//if (vxlan_sockaddr_in_multicast(&sc->vxl_dst_addr) == 1)
+	//	return;
 
 	switch (sc->vxl_src_addr.sa.sa_family) {
 #ifdef INET
@@ -3741,6 +3743,33 @@ vxlan_set_running(struct vxlan_softc *sc, bool running)
 		// FIXME vxlan_delete_tunnel() ???
 		vxlan_teardown(sc);
 }
+
+static void
+vxlan_set_running_callback(epoch_context_t ctx)
+{
+	struct epoch_tracker et;
+	struct rm_priotracker tracker;
+	struct vxlan_softc *sc;
+	bool running = false;
+
+	sc = __containerof(ctx, struct vxlan_softc, epoch_ctx);
+	NET_EPOCH_ENTER(et);
+	VXLAN_RLOCK(sc, &tracker);
+#ifdef INET
+	if (VXLAN_SOCKADDR_IS_IPV4(&sc->vxl_src_addr)) {
+		running = in_localip(sc->vxl_src_addr.in4.sin_addr);
+	}
+#endif
+#ifdef INET6
+	if (VXLAN_SOCKADDR_IS_IPV6(&sc->vxl_src_addr)) {
+		running = in6_localip(&sc->vxl_src_addr.in6.sin6_addr);
+	}
+#endif
+	VXLAN_RUNLOCK(sc, &tracker);
+	NET_EPOCH_EXIT(et);
+
+	vxlan_set_running(sc, running);
+}
 #endif
 
 #ifdef INET
@@ -3756,7 +3785,7 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	struct rm_priotracker tracker;
 	const struct sockaddr_in *sin;
 	struct vxlan_softc *sc;
-	bool running;
+	//bool running;
 
 	if (ipv4_srchashtbl == NULL)
 		return;
@@ -3771,8 +3800,9 @@ in_vxlan_srcaddr(void *arg __unused, const struct sockaddr *sa,
 			continue;
 		}
 		VXLAN_RUNLOCK(sc, &tracker);
-		running = in_localip(sin->sin_addr);
-		vxlan_set_running(sc, running);
+		//running = in_localip(sin->sin_addr);
+		//vxlan_set_running(sc, running);
+		NET_EPOCH_CALL(vxlan_set_running_callback, &sc->epoch_ctx);
 	}
 }
 #endif
