@@ -3766,11 +3766,12 @@ vxlan_set_running_callback(epoch_context_t ctx)
 		running = in6_localip(&sc->vxl_src_addr.in6.sin6_addr);
 	}
 #endif
-	CURVNET_RESTORE();
 	NET_EPOCH_EXIT(et);
 	VXLAN_RUNLOCK(sc, &tracker);
 
 	vxlan_set_running(sc, running);
+
+	CURVNET_RESTORE();
 }
 #endif
 
