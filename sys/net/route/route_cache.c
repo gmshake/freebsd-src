@@ -82,12 +82,12 @@ SYSUNINIT(route_cache_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
 struct route_cache *
 route_cache_alloc(int flags)
 {
-	int i;
+	int cpu;
 	struct route_cache *c;
 	struct route_cache *pcpu_rc = uma_zalloc_pcpu(pcpu_route_cache_zone, flags | M_ZERO);
 	critical_enter();
-	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(pcpu_rc, i);
+	CPU_FOREACH(cpu) {
+		c = zpcpu_get_cpu(pcpu_rc, cpu);
 		c->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 		mtx_init(&c->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
 	}
@@ -98,10 +98,10 @@ route_cache_alloc(int flags)
 void
 route_cache_free(struct route_cache *pcpu_rc)
 {
-	int i;
+	int cpu;
 	struct route_cache *c;
-	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(pcpu_rc, i);
+	CPU_FOREACH(cpu) {
+		c = zpcpu_get_cpu(pcpu_rc, cpu);
 		mtx_lock(&c->rt_mtx);
 		RO_INVALIDATE_CACHE(&c->ro);
 		mtx_unlock(&c->rt_mtx);
@@ -113,10 +113,10 @@ route_cache_free(struct route_cache *pcpu_rc)
 void
 route_cache_invalidate(struct route_cache *pcpu_rc)
 {
-	int i;
+	int cpu;
 	struct route_cache *c;
-	CPU_FOREACH(i) {
-		c = zpcpu_get_cpu(pcpu_rc, i);
+	CPU_FOREACH(cpu) {
+		c = zpcpu_get_cpu(pcpu_rc, cpu);
 		mtx_lock(&c->rt_mtx);
 		RO_INVALIDATE_CACHE(&c->ro);
 		mtx_unlock(&c->rt_mtx);
