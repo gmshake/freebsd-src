@@ -176,7 +176,7 @@ gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gre_softc *sc;
 
 	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK | M_ZERO);
-	sc->gre_route_cache = route_cache_alloc(M_WAITOK);
+	sc->gre_route_cache = route_cache_alloc();
 	sc->gre_fibnum = curthread->td_proc->p_fibnum;
 	GRE2IFP(sc) = if_alloc(IFT_TUNNEL);
 	GRE2IFP(sc)->if_softc = sc;

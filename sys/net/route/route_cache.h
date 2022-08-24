@@ -47,7 +47,7 @@ struct route_cache {
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
-struct route_cache * route_cache_alloc(int flags);
+struct route_cache * route_cache_alloc(void);
 void route_cache_free(struct route_cache *);
 void route_cache_invalidate(struct route_cache *);
 

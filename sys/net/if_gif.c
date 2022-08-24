@@ -143,7 +143,7 @@ gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gif_softc *sc;
 
 	sc = malloc(sizeof(struct gif_softc), M_GIF, M_WAITOK | M_ZERO);
-	sc->gif_route_cache = route_cache_alloc(M_WAITOK);
+	sc->gif_route_cache = route_cache_alloc();
 	sc->gif_fibnum = curthread->td_proc->p_fibnum;
 	GIF2IFP(sc) = if_alloc(IFT_GIF);
 	GIF2IFP(sc)->if_softc = sc;

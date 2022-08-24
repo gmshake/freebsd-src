@@ -196,7 +196,7 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct me_softc *sc;
 
 	sc = malloc(sizeof(struct me_softc), M_IFME, M_WAITOK | M_ZERO);
-	sc->me_route_cache = route_cache_alloc(M_WAITOK);
+	sc->me_route_cache = route_cache_alloc();
 	sc->me_fibnum = curthread->td_proc->p_fibnum;
 	ME2IFP(sc) = if_alloc(IFT_TUNNEL);
 	ME2IFP(sc)->if_softc = sc;

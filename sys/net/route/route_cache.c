@@ -80,11 +80,11 @@ SYSUNINIT(route_cache_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
     route_cache_zone_uninit, NULL);
 
 struct route_cache *
-route_cache_alloc(int flags)
+route_cache_alloc(void)
 {
 	int cpu;
 	struct route_cache *c;
-	struct route_cache *pcpu_rc = uma_zalloc_pcpu(pcpu_route_cache_zone, flags | M_ZERO);
+	struct route_cache *pcpu_rc = uma_zalloc_pcpu(pcpu_route_cache_zone, M_WAITOK | M_ZERO);
 	critical_enter();
 	CPU_FOREACH(cpu) {
 		c = zpcpu_get_cpu(pcpu_rc, cpu);
