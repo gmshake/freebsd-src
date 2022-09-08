@@ -428,7 +428,7 @@ in6_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	error = in6_gre_attach(sc);
 	if (error != 0) {
 		gre_unsubscribe_rib_event(sc);
-		route_cache_invalidate(sc->gre_route_cache);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
 	}
@@ -495,7 +495,7 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
-			route_cache_invalidate(sc->gre_route_cache);
+			route_cache_invalidate(&sc->gre_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET6;
@@ -544,7 +544,7 @@ in6_gre_output(struct ifnet *ifp, struct mbuf *m, int af __unused,
 	gi6->gi6_ip6.ip6_hlim = V_ip6_gre_hlim;
 	gi6->gi6_ip6.ip6_flow |= flowid & IPV6_FLOWLABEL_MASK;
 
-	ro6 = (struct route_in6 *)route_cache_acquire(sc->gre_route_cache);
+	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gre_rc);
 	error = ip6_output(m, NULL, ro6, IPV6_MINMTU, NULL, NULL, NULL);
 	route_cache_release((struct route *)ro6);
 	return (error);
