@@ -127,7 +127,7 @@ route_cache_invalidate(struct route_cache *rc)
 }
 
 static void
-route_cache_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc,
+route_cache_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rci,
     void *arg)
 {
 	struct route_cache *rc = arg;
