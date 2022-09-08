@@ -35,7 +35,7 @@ struct route_cache_entry;
 struct route_cache {
 	struct route_cache_entry	*rce; /* pcpu route cache */
 	struct rib_subscription	*rs;
-}
+};
 
 struct route_cache_entry {
 	struct mtx rt_mtx;
