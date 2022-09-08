@@ -83,6 +83,8 @@
 #include <net/route.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <netinet/in.h>
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 #include <net/vnet.h>
 
