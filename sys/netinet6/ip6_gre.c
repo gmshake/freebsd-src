@@ -536,23 +536,16 @@ in6_gre_output(struct ifnet *ifp, struct mbuf *m, int af __unused,
 {
 	struct gre_softc *sc = ifp->if_softc;
 	struct greip6 *gi6;
-	struct route_cache *rc;
-	struct route_in6 *ro6 = NULL;
-	int route_cache_locked = 0;
+	struct route_in6 *ro6;
 	int error;
 
 	gi6 = mtod(m, struct greip6 *);
 	gi6->gi6_ip6.ip6_hlim = V_ip6_gre_hlim;
 	gi6->gi6_ip6.ip6_flow |= flowid & IPV6_FLOWLABEL_MASK;
 
-	rc = ROUTE_CACHE_GET(sc->gre_route_cache);
-	if (ROUTE_CACHE_TRYLOCK(rc)) {
-		route_cache_locked = 1;
-		ro6 = &rc->ro6;
-	}
+	ro6 = (struct route_in6 *)route_cache_acquire(sc->gre_route_cache);
 	error = ip6_output(m, NULL, ro6, IPV6_MINMTU, NULL, NULL, NULL);
-	if (route_cache_locked)
-		ROUTE_CACHE_UNLOCK(rc);
+	route_cache_release((struct route *)ro6);
 	return (error);
 }
 
