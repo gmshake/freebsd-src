@@ -42,10 +42,13 @@ struct route_cache {
 	};
 } __aligned(CACHE_LINE_SIZE);
 
+#define route2cache(ro)		__containerof((ro), struct route_cache, ro)
+
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
+
 
 struct route_cache * route_cache_alloc(void);
 void route_cache_free(struct route_cache *);
@@ -53,5 +56,29 @@ void route_cache_invalidate(struct route_cache *);
 
 struct rib_subscription * route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
 void route_cache_unsubscribe_rib_event(struct rib_subscription *);
+
+static inline struct route *
+route_cache_acquire(struct route_cache *base)
+{
+	struct route_cache *rc;
+	struct route *ro = NULL;
+
+	rc = ROUTE_CACHE_GET(base);
+	if (ROUTE_CACHE_TRYLOCK(rc))
+		ro = &rc->ro;
+
+	return ro;
+}
+
+static inline void
+route_cache_release(struct route *ro)
+{
+	struct route_cache *rc;
+
+	if (ro != NULL) {
+		rc = route2cache(ro);
+		ROUTE_CACHE_UNLOCK(rc);
+	}
+}
 
 #endif
