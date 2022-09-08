@@ -49,11 +49,12 @@ __FBSDID("$FreeBSD$");
 #include <net/if_llatbl.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
-#include <net/route/route_cache.h>
 #include <net/route/route_ctl.h>
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+
+#include <net/route/route_cache.h>
 
 #include <vm/uma.h>
 
@@ -84,7 +85,7 @@ route_cache_init(struct route_cache *rc)
 {
 	int cpu;
 	struct route_cache_entry *e;
-	struct route_cache_entry *pcpu_rce = uma_zalloc_pcpu(pcpu_route_cache_zone, M_WAITOK | M_ZERO);
+	struct route_cache_entry *pcpu_rce = uma_zalloc_pcpu(pcpu_route_cache_entry_zone, M_WAITOK | M_ZERO);
 	critical_enter();
 	CPU_FOREACH(cpu) {
 		e = zpcpu_get_cpu(pcpu_rce, cpu);
@@ -108,7 +109,7 @@ route_cache_uninit(struct route_cache *rc)
 		mtx_unlock(&e->rt_mtx);
 		mtx_destroy(&e->rt_mtx);
 	}
-	uma_zfree_pcpu(pcpu_route_cache_zone, rc->rce);
+	uma_zfree_pcpu(pcpu_route_cache_entry_zone, rc->rce);
 	rc->rce = NULL; /* XXX change to 0xdeadc0de */
 }
 

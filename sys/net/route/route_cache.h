@@ -82,7 +82,7 @@ route_cache_release(struct route *ro)
 	struct route_cache_entry *rce;
 
 	if (ro != NULL) {
-		rce = route2cache_entry(*ro);
+		rce = route2cache_entry(ro);
 		ROUTE_CACHE_UNLOCK(rce);
 	}
 }
