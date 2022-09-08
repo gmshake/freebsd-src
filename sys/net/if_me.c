@@ -83,8 +83,7 @@ struct me_softc {
 	u_int			me_fibnum;
 	struct in_addr		me_src;
 	struct in_addr		me_dst;
-	struct route_cache	*me_route_cache;
-	struct rib_subscription	*me_rs;
+	struct route_cache	me_rc;
 
 	CK_LIST_ENTRY(me_softc) chain;
 	CK_LIST_ENTRY(me_softc) srchash;
@@ -196,7 +195,7 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct me_softc *sc;
 
 	sc = malloc(sizeof(struct me_softc), M_IFME, M_WAITOK | M_ZERO);
-	sc->me_route_cache = route_cache_alloc();
+	route_cache_init(&sc->me_rc);
 	sc->me_fibnum = curthread->td_proc->p_fibnum;
 	ME2IFP(sc) = if_alloc(IFT_TUNNEL);
 	ME2IFP(sc)->if_softc = sc;
@@ -248,7 +247,7 @@ me_clone_destroy(struct ifnet *ifp)
 
 	ME_WAIT();
 	if_free(ifp);
-	route_cache_free(sc->me_route_cache);
+	route_cache_uninit(&sc->me_rc);
 	free(sc, M_IFME);
 }
 
@@ -256,17 +255,15 @@ static void
 me_subscribe_rib_event(struct me_softc *sc)
 {
 	if (ME_READY(sc))
-		sc->me_rs = route_cache_subscribe_rib_event(sc->me_fibnum,
-		    AF_INET, sc->me_route_cache);
+		route_cache_subscribe_rib_event(sc->me_fibnum,
+		    AF_INET, &sc->me_rc);
 }
 
 static void
 me_unsubscribe_rib_event(struct me_softc *sc)
 {
-	if (sc->me_rs) {
-		route_cache_unsubscribe_rib_event(sc->me_rs);
-		sc->me_rs = NULL;
-	}
+	if (sc->me_rc.rs != NULL)
+		route_cache_unsubscribe_rib_event(&sc->me_rc);
 }
 
 static int
@@ -477,7 +474,7 @@ me_delete_tunnel(struct me_softc *sc)
 
 		sc->me_src.s_addr = 0;
 		sc->me_dst.s_addr = 0;
-		route_cache_invalidate(sc->me_route_cache);
+		route_cache_invalidate(&sc->me_rc);
 		ME2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 		if_link_state_change(ME2IFP(sc), LINK_STATE_DOWN);
 	}
@@ -660,7 +657,7 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	mh.mob_csum = 0;
 	mh.mob_csum = me_in_cksum((uint16_t *)&mh, hlen / sizeof(uint16_t));
 	bcopy(&mh, mtodo(m, sizeof(struct ip)), hlen);
-	ro = route_cache_acquire(sc->me_route_cache);
+	ro = route_cache_acquire(&sc->me_rc);
 	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
 	route_cache_release(ro);
 drop:

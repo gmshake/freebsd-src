@@ -30,7 +30,14 @@
 #ifndef _NET_ROUTE_ROUTE_CACHE_H_
 #define _NET_ROUTE_ROUTE_CACHE_H_
 
+struct route_cache_entry;
+
 struct route_cache {
+	struct route_cache_entry	*rce; /* pcpu route cache */
+	struct rib_subscription	*rs;
+}
+
+struct route_cache_entry {
 	struct mtx rt_mtx;
 	union {
 #ifdef INET
@@ -42,30 +49,33 @@ struct route_cache {
 	};
 } __aligned(CACHE_LINE_SIZE);
 
-#define route2cache(ro)		__containerof((ro), struct route_cache, ro)
+#define route2cache_entry(ro)		__containerof((ro), struct route_cache_entry, ro)
 
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
-
-struct route_cache * route_cache_alloc(void);
-void route_cache_free(struct route_cache *);
+void route_cache_init(struct route_cache *);
+void route_cache_uninit(struct route_cache *);
 void route_cache_invalidate(struct route_cache *);
 
+/*
 struct rib_subscription * route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
 void route_cache_unsubscribe_rib_event(struct rib_subscription *);
+*/
+void route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
+void route_cache_unsubscribe_rib_event(struct route_cache *);
 
 static inline struct route *
-route_cache_acquire(struct route_cache *base)
+route_cache_acquire(struct route_cache *rc)
 {
-	struct route_cache *rc;
+	struct route_cache_entry *rce;
 	struct route *ro = NULL;
 
-	rc = ROUTE_CACHE_GET(base);
-	if (ROUTE_CACHE_TRYLOCK(rc))
-		ro = &rc->ro;
+	rce = ROUTE_CACHE_GET(rc->rce);
+	if (ROUTE_CACHE_TRYLOCK(rce))
+		ro = &rce->ro;
 
 	return ro;
 }
@@ -73,11 +83,11 @@ route_cache_acquire(struct route_cache *base)
 static inline void
 route_cache_release(struct route *ro)
 {
-	struct route_cache *rc;
+	struct route_cache_entry *rce;
 
 	if (ro != NULL) {
-		rc = route2cache(ro);
-		ROUTE_CACHE_UNLOCK(rc);
+		rce = route2cache_entry(ro);
+		ROUTE_CACHE_UNLOCK(rce);
 	}
 }
 

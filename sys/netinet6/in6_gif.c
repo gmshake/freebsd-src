@@ -258,7 +258,7 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
-			route_cache_invalidate(sc->gif_route_cache);
+			route_cache_invalidate(&sc->gif_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET6;
@@ -326,7 +326,7 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= V_ip6_gif_hlim;
 
-	ro6 = (struct route_in6 *)route_cache_acquire(sc->gif_route_cache);
+	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gif_rc);
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve

@@ -38,7 +38,6 @@
 
 #ifdef _KERNEL
 struct route_cache;
-struct rib_subscription;
 
 /* GRE header according to RFC 2784 and RFC 2890 */
 struct grehdr {
@@ -109,8 +108,7 @@ struct gre_softc {
 #endif
 	} gre_uhdr;
 	struct gre_socket	*gre_so;
-	struct route_cache	*gre_route_cache;
-	struct rib_subscription *gre_rs;
+	struct route_cache	gre_rc;
 
 	CK_LIST_ENTRY(gre_softc) chain;
 	CK_LIST_ENTRY(gre_softc) srchash;

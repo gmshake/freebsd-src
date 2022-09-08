@@ -243,7 +243,7 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
-			route_cache_invalidate(sc->gif_route_cache);
+			route_cache_invalidate(&sc->gif_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET;
@@ -312,7 +312,7 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip->ip_len = htons(m->m_pkthdr.len);
 	ip->ip_tos = ecn;
 
-	ro = route_cache_acquire(sc->gif_route_cache);
+	ro = route_cache_acquire(&sc->gif_rc);
 	error = ip_output(m, NULL, ro, 0, NULL, NULL);
 	route_cache_release(ro);
 	return (error);

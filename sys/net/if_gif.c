@@ -143,7 +143,7 @@ gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gif_softc *sc;
 
 	sc = malloc(sizeof(struct gif_softc), M_GIF, M_WAITOK | M_ZERO);
-	sc->gif_route_cache = route_cache_alloc();
+	route_cache_init(&sc->gif_rc);
 	sc->gif_fibnum = curthread->td_proc->p_fibnum;
 	GIF2IFP(sc) = if_alloc(IFT_GIF);
 	GIF2IFP(sc)->if_softc = sc;
@@ -201,7 +201,7 @@ gif_clone_destroy(struct ifnet *ifp)
 
 	GIF_WAIT();
 	if_free(ifp);
-	route_cache_free(sc->gif_route_cache);
+	route_cache_uninit(&sc->gif_rc);
 	free(sc, M_GIF);
 }
 
@@ -596,17 +596,15 @@ void
 gif_subscribe_rib_event(struct gif_softc *sc)
 {
 	if (sc->gif_family != 0)
-		sc->gif_rs = route_cache_subscribe_rib_event(sc->gif_fibnum,
-		    sc->gif_family, sc->gif_route_cache);
+		route_cache_subscribe_rib_event(sc->gif_fibnum,
+		    sc->gif_family, &sc->gif_rc);
 }
 
 void
 gif_unsubscribe_rib_event(struct gif_softc *sc)
 {
-	if (sc->gif_rs) {
-		route_cache_unsubscribe_rib_event(sc->gif_rs);
-		sc->gif_rs = NULL;
-	}
+	if (sc->gif_rc.rs != NULL)
+		route_cache_unsubscribe_rib_event(&sc->gif_rc);
 }
 
 static int
@@ -741,7 +739,7 @@ gif_delete_tunnel(struct gif_softc *sc)
 		/* Wait until it become safe to free gif_hdr */
 		GIF_WAIT();
 		free(sc->gif_hdr, M_GIF);
-		route_cache_invalidate(sc->gif_route_cache);
+		route_cache_invalidate(&sc->gif_rc);
 	}
 	sc->gif_family = 0;
 	GIF2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;

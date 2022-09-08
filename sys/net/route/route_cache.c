@@ -57,69 +57,71 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/uma.h>
 
-static uma_zone_t pcpu_route_cache_zone;
+static uma_zone_t pcpu_route_cache_entry_zone;
 
 static void
-route_cache_zone_init(void)
+route_cache_entry_zone_init(void)
 {
-	pcpu_route_cache_zone = uma_zcreate("pcpu-route-cache",
-	    sizeof(struct route_cache), NULL, NULL, NULL, NULL,
+	pcpu_route_cache_entry_zone = uma_zcreate("pcpu-route-cache-entry",
+	    sizeof(struct route_cache_entry), NULL, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, UMA_ZONE_PCPU);
 }
 
-SYSINIT(route_cache_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
-    route_cache_zone_init, NULL);
+SYSINIT(route_cache_entry_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
+    route_cache_entry_zone_init, NULL);
 
 static void
-route_cache_zone_uninit(void)
+route_cache_entry_zone_uninit(void)
 {
-	uma_zdestroy(pcpu_route_cache_zone);
+	uma_zdestroy(pcpu_route_cache_entry_zone);
 }
 
-SYSUNINIT(route_cache_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
-    route_cache_zone_uninit, NULL);
+SYSUNINIT(route_cache_entry_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
+    route_cache_entry_zone_uninit, NULL);
 
-struct route_cache *
-route_cache_alloc(void)
+void
+route_cache_init(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache *c;
-	struct route_cache *pcpu_rc = uma_zalloc_pcpu(pcpu_route_cache_zone, M_WAITOK | M_ZERO);
+	struct route_cache_entry *e;
+	struct route_cache_entry *pcpu_rce = uma_zalloc_pcpu(pcpu_route_cache_zone, M_WAITOK | M_ZERO);
 	critical_enter();
 	CPU_FOREACH(cpu) {
-		c = zpcpu_get_cpu(pcpu_rc, cpu);
-		c->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
-		mtx_init(&c->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
+		e = zpcpu_get_cpu(pcpu_rce, cpu);
+		e->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
+		mtx_init(&e->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
 	}
 	critical_exit();
-	return (pcpu_rc);
+	rc->rce = pcpu_rce;
+	rc->rs = NULL;
 }
 
 void
-route_cache_free(struct route_cache *pcpu_rc)
+route_cache_uninit(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache *c;
+	struct route_cache_entry *e;
 	CPU_FOREACH(cpu) {
-		c = zpcpu_get_cpu(pcpu_rc, cpu);
-		mtx_lock(&c->rt_mtx);
-		RO_INVALIDATE_CACHE(&c->ro);
-		mtx_unlock(&c->rt_mtx);
-		mtx_destroy(&c->rt_mtx);
+		e = zpcpu_get_cpu(rc->rce, cpu);
+		mtx_lock(&e->rt_mtx);
+		RO_INVALIDATE_CACHE(&e->ro);
+		mtx_unlock(&e->rt_mtx);
+		mtx_destroy(&e->rt_mtx);
 	}
-	uma_zfree_pcpu(pcpu_route_cache_zone, pcpu_rc);
+	uma_zfree_pcpu(pcpu_route_cache_zone, rc->rce);
+	rc->rce = NULL; /* XXX change to 0xdeadc0de */
 }
 
 void
-route_cache_invalidate(struct route_cache *pcpu_rc)
+route_cache_invalidate(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache *c;
+	struct route_cache_entry *e;
 	CPU_FOREACH(cpu) {
-		c = zpcpu_get_cpu(pcpu_rc, cpu);
-		mtx_lock(&c->rt_mtx);
-		RO_INVALIDATE_CACHE(&c->ro);
-		mtx_unlock(&c->rt_mtx);
+		e = zpcpu_get_cpu(rc->rce, cpu);
+		mtx_lock(&e->rt_mtx);
+		RO_INVALIDATE_CACHE(&e->ro);
+		mtx_unlock(&e->rt_mtx);
 	}
 }
 
@@ -127,20 +129,23 @@ static void
 route_cache_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rc,
     void *arg)
 {
-	struct route_cache *pcpu_rc = arg;
-	route_cache_invalidate(pcpu_rc);
-}
-
-struct rib_subscription *
-route_cache_subscribe_rib_event(uint32_t fibnum, int family,
-    struct route_cache *pcpu_rc)
-{
-	return (rib_subscribe(fibnum, family, route_cache_subscription_cb,
-	    pcpu_rc, RIB_NOTIFY_IMMEDIATE, true));
+	struct route_cache *rc = arg;
+	route_cache_invalidate(rc);
 }
 
 void
-route_cache_unsubscribe_rib_event(struct rib_subscription *rs)
+route_cache_subscribe_rib_event(uint32_t fibnum, int family,
+    struct route_cache *rc)
 {
-	rib_unsubscribe(rs);
+	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
+	rc->rs = rib_subscribe(fibnum, family, route_cache_subscription_cb,
+	    rc, RIB_NOTIFY_IMMEDIATE, true);
+}
+
+void
+route_cache_unsubscribe_rib_event(struct route_cache *rc)
+{
+	KASSERT((rc->rs != NULL), ("not subscribe rib event"));
+	rib_unsubscribe(rc->rs);
+	rc->rs = NULL;
 }

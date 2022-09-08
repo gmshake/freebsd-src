@@ -176,7 +176,7 @@ gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gre_softc *sc;
 
 	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK | M_ZERO);
-	sc->gre_route_cache = route_cache_alloc();
+	route_cache_init(&sc->gre_rc);
 	sc->gre_fibnum = curthread->td_proc->p_fibnum;
 	GRE2IFP(sc) = if_alloc(IFT_TUNNEL);
 	GRE2IFP(sc)->if_softc = sc;
@@ -228,7 +228,7 @@ gre_clone_destroy(struct ifnet *ifp)
 
 	GRE_WAIT();
 	if_free(ifp);
-	route_cache_free(sc->gre_route_cache);
+	route_cache_uninit(&sc->gre_rc);
 	free(sc, M_GRE);
 }
 
@@ -236,17 +236,15 @@ void
 gre_subscribe_rib_event(struct gre_softc *sc)
 {
 	if (sc->gre_family != 0)
-		sc->gre_rs = route_cache_subscribe_rib_event(sc->gre_fibnum,
-		    sc->gre_family, sc->gre_route_cache);
+		route_cache_subscribe_rib_event(sc->gre_fibnum,
+		    sc->gre_family, &sc->gre_rc);
 }
 
 void
 gre_unsubscribe_rib_event(struct gre_softc *sc)
 {
-	if (sc->gre_rs) {
-		route_cache_unsubscribe_rib_event(sc->gre_rs);
-		sc->gre_rs = NULL;
-	}
+	if (sc->gre_rc.rs != NULL)
+		route_cache_unsubscribe_rib_event(&sc->gre_rc);
 }
 
 static int
@@ -428,7 +426,7 @@ gre_delete_tunnel(struct gre_softc *sc)
 		CK_LIST_REMOVE(sc, srchash);
 		GRE_WAIT();
 		free(sc->gre_hdr, M_GRE);
-		route_cache_invalidate(sc->gre_route_cache);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 	}
 	/*

@@ -429,7 +429,7 @@ in_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	error = in_gre_attach(sc);
 	if (error != 0) {
 		gre_unsubscribe_rib_event(sc);
-		route_cache_invalidate(sc->gre_route_cache);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
 	}
@@ -487,7 +487,7 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
-			route_cache_invalidate(sc->gre_route_cache);
+			route_cache_invalidate(&sc->gre_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET;
@@ -552,7 +552,7 @@ in_gre_output(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 	gi->gi_ip.ip_ttl = V_ip_gre_ttl;
 	gi->gi_ip.ip_len = htons(m->m_pkthdr.len);
 
-	ro = route_cache_acquire(sc->gre_route_cache);
+	ro = route_cache_acquire(&sc->gre_rc);
 	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
 	route_cache_release(ro);
 	return (error);
