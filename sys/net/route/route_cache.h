@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2021 Zhenlei Huang
+ * Copyright (c) 2022 Zhenlei Huang
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@ struct route_cache_entry;
 
 struct route_cache {
 	struct route_cache_entry	*rce; /* pcpu route cache */
-	struct rib_subscription	*rs;
+	struct rib_subscription		*rs;
 };
 
 struct route_cache_entry {
@@ -54,6 +54,7 @@ struct route_cache_entry {
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
 #define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
+#define ROUTE_CACHE_LOCK_ASSERT(p)	mtx_assert(&(p)->rt_mtx, MA_OWNED)
 #define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
 void route_cache_init(struct route_cache *);
@@ -83,6 +84,7 @@ route_cache_release(struct route *ro)
 
 	if (ro != NULL) {
 		rce = route2cache_entry(ro);
+		ROUTE_CACHE_LOCK_ASSERT(rce);
 		ROUTE_CACHE_UNLOCK(rce);
 	}
 }

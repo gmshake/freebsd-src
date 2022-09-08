@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2021 Zhenlei Huang
+ * Copyright (c) 2022 Zhenlei Huang
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -127,8 +127,8 @@ route_cache_invalidate(struct route_cache *rc)
 }
 
 static void
-route_cache_subscription_cb(struct rib_head *rnh, struct rib_cmd_info *rci,
-    void *arg)
+route_cache_subscription_cb(struct rib_head *rnh __unused,
+    struct rib_cmd_info *rci __unused, void *arg)
 {
 	struct route_cache *rc = arg;
 	route_cache_invalidate(rc);
@@ -146,7 +146,7 @@ route_cache_subscribe_rib_event(uint32_t fibnum, int family,
 void
 route_cache_unsubscribe_rib_event(struct route_cache *rc)
 {
-	KASSERT((rc->rs != NULL), ("not subscribe rib event"));
+	KASSERT((rc->rs != NULL), ("not subscribed"));
 	rib_unsubscribe(rc->rs);
 	rc->rs = NULL;
 }
