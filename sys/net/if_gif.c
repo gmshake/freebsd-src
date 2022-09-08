@@ -65,7 +65,6 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/route/route_ctl.h>
-#include <net/route/route_cache.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
 
@@ -91,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_encap.h>
 #include <net/ethernet.h>
 #include <net/if_bridgevar.h>
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 
 #include <security/mac/mac_framework.h>
