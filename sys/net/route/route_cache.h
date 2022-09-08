@@ -49,7 +49,7 @@ struct route_cache_entry {
 	};
 } __aligned(CACHE_LINE_SIZE);
 
-#define route2cache_entry(ro)		__containerof((ro), struct route_cache_entry, ro)
+#define route2cache_entry(r)		__containerof((r), struct route_cache_entry, ro)
 
 #define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
 #define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
@@ -60,10 +60,6 @@ void route_cache_init(struct route_cache *);
 void route_cache_uninit(struct route_cache *);
 void route_cache_invalidate(struct route_cache *);
 
-/*
-struct rib_subscription * route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
-void route_cache_unsubscribe_rib_event(struct rib_subscription *);
-*/
 void route_cache_subscribe_rib_event(uint32_t, int, struct route_cache *);
 void route_cache_unsubscribe_rib_event(struct route_cache *);
 
@@ -86,7 +82,7 @@ route_cache_release(struct route *ro)
 	struct route_cache_entry *rce;
 
 	if (ro != NULL) {
-		rce = route2cache_entry(ro);
+		rce = route2cache_entry(*ro);
 		ROUTE_CACHE_UNLOCK(rce);
 	}
 }
