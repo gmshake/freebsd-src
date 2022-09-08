@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
-#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -63,6 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/scope6_var.h>
+
+#include <net/route/route_cache.h>
 #include <net/if_gre.h>
 
 VNET_DEFINE(int, ip6_gre_hlim) = IPV6_DEFHLIM;

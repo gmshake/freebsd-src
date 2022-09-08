@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 #include <net/vnet.h>
 #include <net/route.h>
-#include <net/route/route_cache.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -64,6 +63,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/in_cksum.h>
 #include <security/mac/mac_framework.h>
+
+#include <net/route/route_cache.h>
 
 #define	MEMTU			(1500 - sizeof(struct mobhdr))
 static const char mename[] = "me";

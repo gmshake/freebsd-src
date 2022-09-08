@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/route.h>
-#include <net/route/route_cache.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -72,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #endif
 
+#include <net/route/route_cache.h>
 #include <net/if_gre.h>
 #include <machine/in_cksum.h>
 
