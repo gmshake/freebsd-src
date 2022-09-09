@@ -154,7 +154,11 @@ route_cache_subscribe_rib_event(uint32_t fibnum, int family,
 void
 route_cache_unsubscribe_rib_event(struct route_cache *rc)
 {
+	struct epoch_tracker et;
+
 	KASSERT((rc->rs != NULL), ("not subscribed"));
+	NET_EPOCH_ENTER(et);
 	rib_unsubscribe(rc->rs);
 	rc->rs = NULL;
+	NET_EPOCH_EXIT(et);
 }
