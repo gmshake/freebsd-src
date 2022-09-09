@@ -70,6 +70,9 @@
 /*
  * ng_gif(4) netgraph node type
  */
+#include "opt_inet.h"
+#include "opt_inet6.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -83,6 +86,8 @@
 #include <net/route.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <netinet/in.h>
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 #include <net/vnet.h>
 

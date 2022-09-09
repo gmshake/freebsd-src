@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #endif
 
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 
 #define GIF_TTL		30
@@ -234,18 +235,21 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip = malloc(sizeof(*ip), M_GIF, M_WAITOK | M_ZERO);
 		ip->ip_src.s_addr = src->sin_addr.s_addr;
 		ip->ip_dst.s_addr = dst->sin_addr.s_addr;
+		gif_unsubscribe_rib_event(sc);
 		if (sc->gif_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
+			route_cache_invalidate(&sc->gif_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET;
 		sc->gif_iphdr = ip;
 		in_gif_attach(sc);
 		in_gif_set_running(sc);
+		gif_subscribe_rib_event(sc);
 		break;
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:
@@ -272,7 +276,9 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 {
 	struct gif_softc *sc = ifp->if_softc;
 	struct ip *ip;
+	struct route *ro;
 	int len;
+	int error;
 
 	/* prepend new IP header */
 	NET_EPOCH_ASSERT();
@@ -303,7 +309,10 @@ in_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip->ip_len = htons(m->m_pkthdr.len);
 	ip->ip_tos = ecn;
 
-	return (ip_output(m, NULL, NULL, 0, NULL, NULL));
+	ro = route_cache_acquire(&sc->gif_rc);
+	error = ip_output(m, NULL, ro, 0, NULL, NULL);
+	route_cache_release(ro);
+	return (error);
 }
 
 static int

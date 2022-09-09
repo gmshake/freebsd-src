@@ -37,6 +37,8 @@
 #define _NET_IF_GRE_H_
 
 #ifdef _KERNEL
+struct route_cache;
+
 /* GRE header according to RFC 2784 and RFC 2890 */
 struct grehdr {
 	uint16_t	gre_flags;	/* GRE flags */
@@ -106,6 +108,7 @@ struct gre_softc {
 #endif
 	} gre_uhdr;
 	struct gre_socket	*gre_so;
+	struct route_cache	gre_rc;
 
 	CK_LIST_ENTRY(gre_softc) chain;
 	CK_LIST_ENTRY(gre_softc) srchash;
@@ -141,17 +144,20 @@ void	gre_update_hdr(struct gre_softc *, struct grehdr *);
 void	gre_update_udphdr(struct gre_softc *, struct udphdr *, uint16_t);
 void	gre_sofree(epoch_context_t);
 
+void	gre_subscribe_rib_event(struct gre_softc *);
+void	gre_unsubscribe_rib_event(struct gre_softc *);
+
 void	in_gre_init(void);
 void	in_gre_uninit(void);
 int	in_gre_setopts(struct gre_softc *, u_long, uint32_t);
 int	in_gre_ioctl(struct gre_softc *, u_long, caddr_t);
-int	in_gre_output(struct mbuf *, int, int);
+int	in_gre_output(struct ifnet *, struct mbuf *, int, int);
 
 void	in6_gre_init(void);
 void	in6_gre_uninit(void);
 int	in6_gre_setopts(struct gre_softc *, u_long, uint32_t);
 int	in6_gre_ioctl(struct gre_softc *, u_long, caddr_t);
-int	in6_gre_output(struct mbuf *, int, int, uint32_t);
+int	in6_gre_output(struct ifnet *, struct mbuf *, int, int, uint32_t);
 /*
  * CISCO uses special type for GRE tunnel created as part of WCCP
  * connection, while in fact those packets are just IPv4 encapsulated

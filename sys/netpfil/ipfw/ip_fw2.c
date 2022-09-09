@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #endif
 
+#include <net/route/route_cache.h>
 #include <net/if_gre.h> /* for struct grehdr */
 
 #include <netpfil/ipfw/ip_fw_private.h>

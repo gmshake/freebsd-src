@@ -23,6 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "opt_inet.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -63,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/in_cksum.h>
 #include <security/mac/mac_framework.h>
 
+#include <net/route/route_cache.h>
+
 #define	MEMTU			(1500 - sizeof(struct mobhdr))
 static const char mename[] = "me";
 static MALLOC_DEFINE(M_IFME, mename, "Minimal Encapsulation for IP");
@@ -81,6 +84,7 @@ struct me_softc {
 	u_int			me_fibnum;
 	struct in_addr		me_src;
 	struct in_addr		me_dst;
+	struct route_cache	me_rc;
 
 	CK_LIST_ENTRY(me_softc) chain;
 	CK_LIST_ENTRY(me_softc) srchash;
@@ -192,6 +196,7 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct me_softc *sc;
 
 	sc = malloc(sizeof(struct me_softc), M_IFME, M_WAITOK | M_ZERO);
+	route_cache_init(&sc->me_rc);
 	sc->me_fibnum = curthread->td_proc->p_fibnum;
 	ME2IFP(sc) = if_alloc(IFT_TUNNEL);
 	ME2IFP(sc)->if_softc = sc;
@@ -243,7 +248,23 @@ me_clone_destroy(struct ifnet *ifp)
 
 	ME_WAIT();
 	if_free(ifp);
+	route_cache_uninit(&sc->me_rc);
 	free(sc, M_IFME);
+}
+
+static void
+me_subscribe_rib_event(struct me_softc *sc)
+{
+	if (ME_READY(sc))
+		route_cache_subscribe_rib_event(sc->me_fibnum,
+		    AF_INET, &sc->me_rc);
+}
+
+static void
+me_unsubscribe_rib_event(struct me_softc *sc)
+{
+	if (sc->me_rc.rs != NULL)
+		route_cache_unsubscribe_rib_event(&sc->me_rc);
 }
 
 static int
@@ -326,8 +347,11 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else {
 			sc->me_fibnum = ifr->ifr_fib;
+			me_unsubscribe_rib_event(sc);
+			me_subscribe_rib_event(sc);
+		}
 		break;
 	default:
 		error = EINVAL;
@@ -431,6 +455,7 @@ me_set_tunnel(struct me_softc *sc, in_addr_t src, in_addr_t dst)
 
 	me_set_running(sc);
 	if_link_state_change(ME2IFP(sc), LINK_STATE_UP);
+	me_subscribe_rib_event(sc);
 	return (0);
 }
 
@@ -439,6 +464,7 @@ me_delete_tunnel(struct me_softc *sc)
 {
 
 	sx_assert(&me_ioctl_sx, SA_XLOCKED);
+	me_unsubscribe_rib_event(sc);
 	if (ME_READY(sc)) {
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);
@@ -446,6 +472,7 @@ me_delete_tunnel(struct me_softc *sc)
 
 		sc->me_src.s_addr = 0;
 		sc->me_dst.s_addr = 0;
+		route_cache_invalidate(&sc->me_rc);
 		ME2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 		if_link_state_change(ME2IFP(sc), LINK_STATE_DOWN);
 	}
@@ -554,6 +581,7 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct me_softc *sc;
 	struct ip *ip;
 	uint32_t af;
+	struct route *ro;
 	int error, hlen, plen;
 
 	ME_RLOCK();
@@ -627,7 +655,9 @@ me_transmit(struct ifnet *ifp, struct mbuf *m)
 	mh.mob_csum = 0;
 	mh.mob_csum = me_in_cksum((uint16_t *)&mh, hlen / sizeof(uint16_t));
 	bcopy(&mh, mtodo(m, sizeof(struct ip)), hlen);
-	error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
+	ro = route_cache_acquire(&sc->me_rc);
+	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
+	route_cache_release(ro);
 drop:
 	if (error)
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);

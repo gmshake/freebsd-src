@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_ecn.h>
 #include <netinet6/in6_fib.h>
 
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 
 #define GIF_HLIM	30
@@ -250,17 +251,20 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
 		ip6->ip6_vfc = IPV6_VERSION;
+		gif_unsubscribe_rib_event(sc);
 		if (sc->gif_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
+			route_cache_invalidate(&sc->gif_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET6;
 		sc->gif_ip6hdr = ip6;
 		in6_gif_attach(sc);
+		gif_subscribe_rib_event(sc);
 		in6_gif_set_running(sc);
 		break;
 	case SIOCGIFPSRCADDR_IN6:
@@ -290,7 +294,9 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 {
 	struct gif_softc *sc = ifp->if_softc;
 	struct ip6_hdr *ip6;
+	struct route_in6 *ro6;
 	int len;
+	int error;
 
 	/* prepend new IP header */
 	NET_EPOCH_ASSERT();
@@ -319,12 +325,16 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip6->ip6_flow  |= htonl((uint32_t)ecn << 20);
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= V_ip6_gif_hlim;
+
+	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gif_rc);
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	return (ip6_output(m, 0, NULL, IPV6_MINMTU, 0, NULL, NULL));
+	error = ip6_output(m, 0, ro6, IPV6_MINMTU, 0, NULL, NULL);
+	route_cache_release((struct route *)ro6);
+	return (error);
 }
 
 static int

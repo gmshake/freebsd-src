@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/route.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -61,6 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/scope6_var.h>
+
+#include <net/route/route_cache.h>
 #include <net/if_gre.h>
 
 VNET_DEFINE(int, ip6_gre_hlim) = IPV6_DEFHLIM;
@@ -439,6 +442,8 @@ in6_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	}
 	error = in6_gre_attach(sc);
 	if (error != 0) {
+		gre_unsubscribe_rib_event(sc);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
 	}
@@ -498,12 +503,14 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		    M_GRE, M_WAITOK | M_ZERO);
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
+		gre_unsubscribe_rib_event(sc);
 		if (sc->gre_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, chain);
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
+			route_cache_invalidate(&sc->gre_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET6;
@@ -514,7 +521,8 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		if (error != 0) {
 			sc->gre_family = 0;
 			free(sc->gre_hdr, M_GRE);
-		}
+		} else
+			gre_subscribe_rib_event(sc);
 		break;
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -539,15 +547,22 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 }
 
 int
-in6_gre_output(struct mbuf *m, int af __unused, int hlen __unused,
-    uint32_t flowid)
+in6_gre_output(struct ifnet *ifp, struct mbuf *m, int af __unused,
+    int hlen __unused, uint32_t flowid)
 {
+	struct gre_softc *sc = ifp->if_softc;
 	struct greip6 *gi6;
+	struct route_in6 *ro6;
+	int error;
 
 	gi6 = mtod(m, struct greip6 *);
 	gi6->gi6_ip6.ip6_hlim = V_ip6_gre_hlim;
 	gi6->gi6_ip6.ip6_flow |= flowid & IPV6_FLOWLABEL_MASK;
-	return (ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, NULL, NULL));
+
+	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gre_rc);
+	error = ip6_output(m, NULL, ro6, IPV6_MINMTU, NULL, NULL, NULL);
+	route_cache_release((struct route *)ro6);
+	return (error);
 }
 
 static const struct srcaddrtab *ipv6_srcaddrtab = NULL;
