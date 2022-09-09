@@ -30,6 +30,9 @@
 #ifndef _NET_ROUTE_ROUTE_CACHE_H_
 #define _NET_ROUTE_ROUTE_CACHE_H_
 
+VNET_DECLARE(u_int, route_cache);
+#define V_route_cache VNET(route_cache)
+
 struct route_cache_entry;
 
 struct route_cache {
@@ -70,9 +73,11 @@ route_cache_acquire(struct route_cache *rc)
 	struct route_cache_entry *rce;
 	struct route *ro = NULL;
 
-	rce = ROUTE_CACHE_GET(rc->rce);
-	if (ROUTE_CACHE_TRYLOCK(rce))
-		ro = &rce->ro;
+	if (V_route_cache) {
+		rce = ROUTE_CACHE_GET(rc->rce);
+		if (ROUTE_CACHE_TRYLOCK(rce))
+			ro = &rce->ro;
+	}
 
 	return ro;
 }

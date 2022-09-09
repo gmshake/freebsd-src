@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 
 #include <sys/kernel.h>
 #include <sys/types.h>
@@ -47,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_llatbl.h>
+#include <net/vnet.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/route_ctl.h>
@@ -57,6 +59,11 @@ __FBSDID("$FreeBSD$");
 #include <net/route/route_cache.h>
 
 #include <vm/uma.h>
+
+
+VNET_DEFINE(u_int, route_cache) = 1;
+SYSCTL_UINT(_net_route, OID_AUTO, cache, CTLFLAG_RW | CTLFLAG_VNET,
+&VNET_NAME(route_cache), 0, "Enable route cache");
 
 static uma_zone_t pcpu_route_cache_entry_zone;
 
