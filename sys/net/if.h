@@ -99,6 +99,7 @@ struct if_data {
 	uint64_t	ifi_iqdrops;	/* dropped on input */
 	uint64_t	ifi_oqdrops;	/* dropped on output */
 	uint64_t	ifi_noproto;	/* destined for unsupported protocol */
+    uint64_t    ifi_ocycles;    /* total cycles used on sending packets */
 	uint64_t	ifi_hwassist;	/* HW offload capabilities, see IFCAP */
 
 	/* Unions are here to make sizes MI. */

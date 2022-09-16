@@ -408,8 +408,11 @@ int
 gif_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	struct route *ro)
 {
+    int error;
 	uint32_t af;
+    uint64_t tsc;
 
+    tsc = rdtscp();
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
 	else
@@ -420,7 +423,9 @@ gif_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	 * the gif_transmit() routine, avoiding using yet another mtag.
 	 */
 	m->m_pkthdr.csum_data = af;
-	return (ifp->if_transmit(ifp, m));
+	error = ifp->if_transmit(ifp, m);
+    if_inc_counter(ifp, IFCOUNTER_OCYCLES, rdtscp() - tsc);
+    return error;
 }
 
 void

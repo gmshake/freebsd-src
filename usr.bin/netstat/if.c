@@ -425,6 +425,8 @@ intpr(void (*pfunc)(char *), int af)
 			    link|network, 0);
 		show_stat("lu", 8, "sent-packets", IFA_STAT(opackets),
 		    link|network, 1);
+        show_stat(".1f", 5, "cycles-per-packet", 1.0 * IFA_STAT(ocycles) / IFA_STAT(opackets),
+                  link|network, 0);
 		show_stat("lu", 5, "send-errors", IFA_STAT(oerrors), link, 1);
 		if (bflag)
 			show_stat("lu", 10, "sent-bytes", IFA_STAT(obytes),
@@ -507,6 +509,7 @@ struct iftot {
 	u_long	ift_op;			/* output packets */
 	u_long	ift_oe;			/* output errors */
 	u_long	ift_od;			/* output drops */
+	u_long	ift_oc;         /* output cycles */
 	u_long	ift_co;			/* collisions */
 	u_long	ift_ib;			/* input bytes */
 	u_long	ift_ob;			/* output bytes */
@@ -544,6 +547,7 @@ fill_iftot(struct iftot *st)
 		st->ift_oe += IFA_STAT(oerrors);
 		st->ift_od += IFA_STAT(oqdrops);
 		st->ift_ob += IFA_STAT(obytes);
+        st->ift_oc += IFA_STAT(ocycles);
  		st->ift_co += IFA_STAT(collisions);
 	}
 
@@ -592,9 +596,9 @@ sidewaysintpr(void)
 banner:
 	xo_emit("{T:/%17s} {T:/%14s} {T:/%16s}\n", "input",
 	    interface != NULL ? interface : "(Total)", "output");
-	xo_emit("{T:/%10s} {T:/%5s} {T:/%5s} {T:/%10s} {T:/%10s} {T:/%5s} "
+	xo_emit("{T:/%10s} {T:/%5s} {T:/%5s} {T:/%10s} {T:/%5s} {T:/%10s} {T:/%5s} "
 	    "{T:/%10s} {T:/%5s}",
-	    "packets", "errs", "idrops", "bytes", "packets", "errs", "bytes",
+	    "packets", "errs", "idrops", "bytes", "packets", "c/p", "errs", "bytes",
 	    "colls");
 	if (dflag)
 		xo_emit(" {T:/%5.5s}", "drops");
@@ -627,6 +631,8 @@ loop:
 	    new->ift_ib - old->ift_ib, 1, 0);
 	show_stat("lu", 10, "sent-packets",
 	    new->ift_op - old->ift_op, 1, 1);
+    show_stat("lu", 5, "cycles-per-packet",
+        new->ift_op - old->ift_op != 0 ? (new->ift_oc - old->ift_oc) / (new->ift_op - old->ift_op) : 0, 1, 0);
 	show_stat("lu", 5, "send-errors",
 	    new->ift_oe - old->ift_oe, 1, 1);
 	show_stat("lu", 10, "sent-bytes",

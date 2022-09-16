@@ -1836,6 +1836,7 @@ if_data_copy(struct ifnet *ifp, struct if_data *ifd)
 	ifd->ifi_iqdrops = ifp->if_get_counter(ifp, IFCOUNTER_IQDROPS);
 	ifd->ifi_oqdrops = ifp->if_get_counter(ifp, IFCOUNTER_OQDROPS);
 	ifd->ifi_noproto = ifp->if_get_counter(ifp, IFCOUNTER_NOPROTO);
+    ifd->ifi_ocycles = ifp->if_get_counter(ifp, IFCOUNTER_OCYCLES);
 }
 
 /*

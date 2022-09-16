@@ -121,6 +121,7 @@ typedef enum {
 	IFCOUNTER_IQDROPS,
 	IFCOUNTER_OQDROPS,
 	IFCOUNTER_NOPROTO,
+    IFCOUNTER_OCYCLES,
 	IFCOUNTERS /* Array size. */
 } ift_counter;
 
