@@ -350,6 +350,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else {
 			sc->me_fibnum = ifr->ifr_fib;
 			me_unsubscribe_rib_event(sc);
+			route_cache_invalidate(&sc->me_rc);
 			me_subscribe_rib_event(sc);
 		}
 		break;

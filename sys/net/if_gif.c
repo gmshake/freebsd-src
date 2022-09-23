@@ -64,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/route.h>
-#include <net/route/route_ctl.h>
 #include <net/bpf.h>
 #include <net/vnet.h>
 
@@ -669,6 +668,7 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else {
 			sc->gif_fibnum = ifr->ifr_fib;
 			gif_unsubscribe_rib_event(sc);
+			route_cache_invalidate(&sc->gif_rc);
 			gif_subscribe_rib_event(sc);
 		}
 		break;

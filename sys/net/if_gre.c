@@ -314,6 +314,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else {
 			sc->gre_fibnum = ifr->ifr_fib;
 			gre_unsubscribe_rib_event(sc);
+			route_cache_invalidate(&sc->gre_rc);
 			gre_subscribe_rib_event(sc);
 		}
 		break;
