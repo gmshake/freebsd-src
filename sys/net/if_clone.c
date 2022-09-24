@@ -235,7 +235,7 @@ if_clone_create(char *name, size_t len, caddr_t params)
 }
 
 void
-if_clone_addif(struct if_clone *ifc, struct ifnet *ifp)
+ifc_link_ifp(struct if_clone *ifc, struct ifnet *ifp)
 {
 
 	if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
@@ -244,6 +244,50 @@ if_clone_addif(struct if_clone *ifc, struct ifnet *ifp)
 	IF_CLONE_LOCK(ifc);
 	IFC_IFLIST_INSERT(ifc, ifp);
 	IF_CLONE_UNLOCK(ifc);
+}
+
+void
+if_clone_addif(struct if_clone *ifc, struct ifnet *ifp)
+{
+	ifc_link_ifp(ifc, ifp);
+}
+
+bool
+ifc_unlink_ifp(struct if_clone *ifc, struct ifnet *ifp)
+{
+	struct ifnet *ifcifp;
+
+	IF_CLONE_LOCK(ifc);
+	LIST_FOREACH(ifcifp, &ifc->ifc_iflist, if_clones) {
+		if (ifcifp == ifp) {
+			IFC_IFLIST_REMOVE(ifc, ifp);
+			break;
+		}
+	}
+	IF_CLONE_UNLOCK(ifc);
+
+	if (ifcifp != NULL && (ifc->ifc_flags & IFC_F_NOGROUP) == 0)
+		if_delgroup(ifp, ifc->ifc_name);
+
+	return (ifcifp != NULL);
+}
+
+static struct if_clone *
+ifc_find_cloner(const char *name, struct vnet *vnet)
+{
+	struct if_clone *ifc;
+
+	CURVNET_SET_QUIET(vnet);
+	IF_CLONERS_LOCK();
+	LIST_FOREACH(ifc, &V_if_cloners, ifc_list) {
+		if (strcmp(ifc->ifc_name, name) == 0) {
+			break;
+		}
+	}
+	IF_CLONERS_UNLOCK();
+	CURVNET_RESTORE();
+
+	return (ifc);
 }
 
 /*
@@ -289,23 +333,7 @@ if_clone_destroy(const char *name)
 	if (ifp == NULL)
 		return (ENXIO);
 
-	/* Find the cloner for this interface */
-	IF_CLONERS_LOCK();
-	LIST_FOREACH(ifc, &V_if_cloners, ifc_list) {
-		if (strcmp(ifc->ifc_name, ifp->if_dname) == 0) {
-			break;
-		}
-	}
-#ifdef VIMAGE
-	if (ifc == NULL && !IS_DEFAULT_VNET(curvnet)) {
-		CURVNET_SET_QUIET(vnet0);
-		LIST_FOREACH(ifc, &V_if_cloners, ifc_list)
-			if (ifc->ifc_match(ifc, name))
-				break;
-		CURVNET_RESTORE();
-	}
-#endif
-	IF_CLONERS_UNLOCK();
+	ifc = ifc_find_cloner(ifp->if_dname, ifp->if_home_vnet);
 	if (ifc == NULL) {
 		if_rele(ifp);
 		return (EINVAL);
@@ -323,7 +351,6 @@ static int
 if_clone_destroyif_flags(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
 	int err;
-	struct ifnet *ifcifp;
 
 	/*
 	 * Given that the cloned ifnet might be attached to a different
@@ -332,32 +359,17 @@ if_clone_destroyif_flags(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags
 	 */
 	CURVNET_SET_QUIET(ifp->if_vnet);
 
-	IF_CLONE_LOCK(ifc);
-	LIST_FOREACH(ifcifp, &ifc->ifc_iflist, if_clones) {
-		if (ifcifp == ifp) {
-			IFC_IFLIST_REMOVE(ifc, ifp);
-			break;
-		}
-	}
-	IF_CLONE_UNLOCK(ifc);
-	if (ifcifp == NULL) {
+	if (!ifc_unlink_ifp(ifc, ifp)) {
 		CURVNET_RESTORE();
 		return (ENXIO);		/* ifp is not on the list. */
 	}
-	if ((ifc->ifc_flags & IFC_F_NOGROUP) == 0)
-		if_delgroup(ifp, ifc->ifc_name);
 
 	int unit = ifp->if_dunit;
 	err = (*ifc->ifc_destroy)(ifc, ifp, flags);
 
-	if (err != 0) {
-		if ((ifc->ifc_flags & IFC_F_NOGROUP) == 0)
-			if_addgroup(ifp, ifc->ifc_name);
-
-		IF_CLONE_LOCK(ifc);
-		IFC_IFLIST_INSERT(ifc, ifp);
-		IF_CLONE_UNLOCK(ifc);
-	} else if (ifc->ifc_flags & IFC_F_AUTOUNIT)
+	if (err != 0)
+		ifc_link_ifp(ifc, ifp);
+	else if (ifc->ifc_flags & IFC_F_AUTOUNIT)
 		ifc_free_unit(ifc, unit);
 	CURVNET_RESTORE();
 	return (err);
