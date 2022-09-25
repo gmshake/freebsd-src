@@ -85,6 +85,7 @@ enum gpt_state {
 	GPT_STATE_MISSING,	/* No signature found. */
 	GPT_STATE_CORRUPT,	/* Checksum mismatch. */
 	GPT_STATE_INVALID,	/* Nonconformant/invalid. */
+	GPT_STATE_UNSUPPORTED,  /* Not supported. */
 	GPT_STATE_OK		/* Perfectly fine. */
 };
 
@@ -148,13 +149,15 @@ static kobj_method_t g_part_gpt_methods[] = {
 	{ 0, 0 }
 };
 
+#define MAX_GPT_ENTRIES 4096
+
 static struct g_part_scheme g_part_gpt_scheme = {
 	"GPT",
 	g_part_gpt_methods,
 	sizeof(struct g_part_gpt_table),
 	.gps_entrysz = sizeof(struct g_part_gpt_entry),
 	.gps_minent = 128,
-	.gps_maxent = 4096,
+	.gps_maxent = MAX_GPT_ENTRIES,
 	.gps_bootcodesz = MBRSIZE,
 };
 G_PART_SCHEME_DECLARE(g_part_gpt);
@@ -518,7 +521,10 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
 		goto fail;
 
-	table->state[elt] = GPT_STATE_OK;
+	if (hdr->hdr_entries > MAX_GPT_ENTRIES)
+		table->state[elt] = GPT_STATE_UNSUPPORTED;
+	else
+		table->state[elt] = GPT_STATE_OK;
 	le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
 	hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
 
@@ -958,11 +964,17 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		sectbl = NULL;
 	}
 
+
 	/* Fail if we haven't got any good tables at all. */
 	if (table->state[GPT_ELT_PRITBL] != GPT_STATE_OK &&
 	    table->state[GPT_ELT_SECTBL] != GPT_STATE_OK) {
-		printf("GEOM: %s: corrupt or invalid GPT detected.\n",
-		    pp->name);
+		if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
+		    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED)
+			printf("GEOM: %s: unsupported GPT detected.\n",
+			    pp->name);
+		else
+			printf("GEOM: %s: corrupt or invalid GPT detected.\n",
+			    pp->name);
 		printf("GEOM: %s: GPT rejected -- may not be recoverable.\n",
 		    pp->name);
 		if (prihdr != NULL)
