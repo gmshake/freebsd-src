@@ -149,7 +149,8 @@ static kobj_method_t g_part_gpt_methods[] = {
 	{ 0, 0 }
 };
 
-#define MAX_GPT_ENTRIES 4096
+#define MAXTBLENTS 4096
+#define MAXENTSIZE 1024
 
 static struct g_part_scheme g_part_gpt_scheme = {
 	"GPT",
@@ -157,7 +158,7 @@ static struct g_part_scheme g_part_gpt_scheme = {
 	sizeof(struct g_part_gpt_table),
 	.gps_entrysz = sizeof(struct g_part_gpt_entry),
 	.gps_minent = 128,
-	.gps_maxent = MAX_GPT_ENTRIES,
+	.gps_maxent = MAXTBLENTS,
 	.gps_bootcodesz = MBRSIZE,
 };
 G_PART_SCHEME_DECLARE(g_part_gpt);
@@ -521,12 +522,13 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
 		goto fail;
 
-	if (hdr->hdr_entries > MAX_GPT_ENTRIES)
+	if (hdr->hdr_entries > MAXTBLENTS || hdr->hdr_entsz > MAXENTSIZE)
 		table->state[elt] = GPT_STATE_UNSUPPORTED;
-	else
+	else {
 		table->state[elt] = GPT_STATE_OK;
-	le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
-	hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
+		le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
+		hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
+	}
 
 	/* save LBA for secondary header */
 	if (elt == GPT_ELT_PRIHDR)
@@ -964,17 +966,24 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		sectbl = NULL;
 	}
 
+	/* Fail if both tables are unsupported */
+	if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
+	    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED) {
+		printf("GEOM: %s: unsupported GPT detected.\n",
+		    pp->name);
+		printf("GEOM: %s: GPT rejected.\n", pp->name);
+		if (prihdr != NULL)
+			g_free(prihdr);
+		if (sechdr != NULL)
+			g_free(sechdr);
+		return (EINVAL);
+	}
 
 	/* Fail if we haven't got any good tables at all. */
 	if (table->state[GPT_ELT_PRITBL] != GPT_STATE_OK &&
 	    table->state[GPT_ELT_SECTBL] != GPT_STATE_OK) {
-		if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
-		    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED)
-			printf("GEOM: %s: unsupported GPT detected.\n",
-			    pp->name);
-		else
-			printf("GEOM: %s: corrupt or invalid GPT detected.\n",
-			    pp->name);
+		printf("GEOM: %s: corrupt or invalid GPT detected.\n",
+		    pp->name);
 		printf("GEOM: %s: GPT rejected -- may not be recoverable.\n",
 		    pp->name);
 		if (prihdr != NULL)
