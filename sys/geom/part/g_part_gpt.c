@@ -490,6 +490,8 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 		goto fail;
 	if (hdr->hdr_lba_alt > last && geom_part_check_integrity)
 		goto fail;
+	if (elt == GPT_ELT_SECHDR && hdr->hdr_lba_alt != 1)
+		goto fail;
 
 	/* Check the managed area. */
 	hdr->hdr_lba_start = le64toh(buf->hdr_lba_start);
