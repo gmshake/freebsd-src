@@ -149,12 +149,7 @@ static kobj_method_t g_part_gpt_methods[] = {
 	{ 0, 0 }
 };
 
-#define MAXTBLENTS 4096
 #define MAXENTSIZE 1024
-
-static u_int max_ents = MAXTBLENTS;
-SYSCTL_UINT(_kern_geom_part_gpt, OID_AUTO, max_ents,
-    CTLFLAG_RW, &max_ents, 0, "Maximum GPT table entries allowd");
 
 static struct g_part_scheme g_part_gpt_scheme = {
 	"GPT",
@@ -162,7 +157,7 @@ static struct g_part_scheme g_part_gpt_scheme = {
 	sizeof(struct g_part_gpt_table),
 	.gps_entrysz = sizeof(struct g_part_gpt_entry),
 	.gps_minent = 128,
-	.gps_maxent = MAXTBLENTS,
+	.gps_maxent = 4096,
 	.gps_bootcodesz = MBRSIZE,
 };
 G_PART_SCHEME_DECLARE(g_part_gpt);
@@ -526,7 +521,8 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
 		goto fail;
 
-	if (hdr->hdr_entries > max_ents || hdr->hdr_entsz > MAXENTSIZE)
+	if (hdr->hdr_entries > g_part_gpt_scheme.gps_maxent ||
+	    hdr->hdr_entsz > MAXENTSIZE)
 		table->state[elt] = GPT_STATE_UNSUPPORTED;
 	else
 		table->state[elt] = GPT_STATE_OK;
@@ -972,7 +968,7 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 	/* Fail if we haven't got any good tables at all. */
 	if (table->state[GPT_ELT_PRITBL] != GPT_STATE_OK &&
 	    table->state[GPT_ELT_SECTBL] != GPT_STATE_OK) {
-		/* Fail if both tables are unsupported */
+		/* XXX arbitrarily report unsupported as the table is not checked */
 		if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
 		    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED &&
 		    gpt_matched_hdrs(prihdr, sechdr)) {
