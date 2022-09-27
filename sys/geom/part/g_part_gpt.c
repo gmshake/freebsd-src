@@ -152,6 +152,10 @@ static kobj_method_t g_part_gpt_methods[] = {
 #define MAXTBLENTS 4096
 #define MAXENTSIZE 1024
 
+static u_int max_ents = MAXTBLENTS;
+SYSCTL_UINT(_kern_geom_part_gpt, OID_AUTO, max_ents,
+    CTLFLAG_RW, &max_ents, 0, "Maximum GPT table entries allowd");
+
 static struct g_part_scheme g_part_gpt_scheme = {
 	"GPT",
 	g_part_gpt_methods,
@@ -522,13 +526,12 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
 		goto fail;
 
-	if (hdr->hdr_entries > MAXTBLENTS || hdr->hdr_entsz > MAXENTSIZE)
+	if (hdr->hdr_entries > max_ents || hdr->hdr_entsz > MAXENTSIZE)
 		table->state[elt] = GPT_STATE_UNSUPPORTED;
-	else {
+	else
 		table->state[elt] = GPT_STATE_OK;
-		le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
-		hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
-	}
+	le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
+	hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
 
 	/* save LBA for secondary header */
 	if (elt == GPT_ELT_PRIHDR)
@@ -966,26 +969,22 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		sectbl = NULL;
 	}
 
-	/* Fail if both tables are unsupported */
-	if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
-	    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED) {
-		printf("GEOM: %s: unsupported GPT detected.\n",
-		    pp->name);
-		printf("GEOM: %s: GPT rejected.\n", pp->name);
-		if (prihdr != NULL)
-			g_free(prihdr);
-		if (sechdr != NULL)
-			g_free(sechdr);
-		return (EINVAL);
-	}
-
 	/* Fail if we haven't got any good tables at all. */
 	if (table->state[GPT_ELT_PRITBL] != GPT_STATE_OK &&
 	    table->state[GPT_ELT_SECTBL] != GPT_STATE_OK) {
-		printf("GEOM: %s: corrupt or invalid GPT detected.\n",
-		    pp->name);
-		printf("GEOM: %s: GPT rejected -- may not be recoverable.\n",
-		    pp->name);
+		/* Fail if both tables are unsupported */
+		if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
+		    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED &&
+		    gpt_matched_hdrs(prihdr, sechdr)) {
+			printf("GEOM: %s: unsupported GPT detected.\n",
+			    pp->name);
+			printf("GEOM: %s: GPT rejected.\n", pp->name);
+		} else {
+			printf("GEOM: %s: corrupt or invalid GPT detected.\n",
+			    pp->name);
+			printf("GEOM: %s: GPT rejected -- may not be recoverable.\n",
+			    pp->name);
+		}
 		if (prihdr != NULL)
 			g_free(prihdr);
 		if (pritbl != NULL)
