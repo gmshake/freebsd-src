@@ -69,8 +69,8 @@ static int	g_llvm_read_label(struct g_consumer *, struct g_llvm_label *);
 static int	g_llvm_read_md(struct g_consumer *, struct g_llvm_metadata *,
 		    struct g_llvm_label *);
 
-static int	llvm_label_decode(const u_char *, struct g_llvm_label *, int
-		    u_int);
+static int	llvm_label_decode(const u_char *, struct g_llvm_label *,
+		    int, u_int);
 static int	llvm_md_decode(const u_char *, struct g_llvm_metadata *,
 		    struct g_llvm_label *);
 static int	llvm_textconf_decode(u_char *, int,
