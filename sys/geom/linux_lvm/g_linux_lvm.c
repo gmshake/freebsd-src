@@ -640,7 +640,7 @@ g_llvm_read_label(struct g_consumer *cp, struct g_llvm_label *ll)
 
 	/* Search the four sectors for the LVM label. */
 	for (i = 0; i < 4; i++) {
-		error = llvm_label_decode(&buf[i * pp->sectorsize], ll, i
+		error = llvm_label_decode(&buf[i * pp->sectorsize], ll, i,
 			    pp->sectorsize);
 		if (error == 0)
 			break;	/* found it */
