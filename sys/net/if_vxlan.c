@@ -2480,7 +2480,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	struct ip *ip;
 	struct in_addr srcaddr, dstaddr;
 	uint16_t srcport, dstport;
-	int len, mcast, error;
+	int plen, len, mcast, error;
 	struct route route, *ro;
 	struct sockaddr_in *sin;
 	uint32_t csum_flags;
@@ -2493,6 +2493,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	dstaddr = fvxlsa->in4.sin_addr;
 	dstport = fvxlsa->in4.sin_port;
 
+	plen = m->m_pkthdr.len;
 	M_PREPEND(m, sizeof(struct ip) + sizeof(struct vxlanudphdr),
 	    M_NOWAIT);
 	if (m == NULL) {
@@ -2570,7 +2571,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	error = ip_output(m, NULL, ro, 0, sc->vxl_im4o, NULL);
 	if (error == 0) {
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
-		if_inc_counter(ifp, IFCOUNTER_OBYTES, len);
+		if_inc_counter(ifp, IFCOUNTER_OBYTES, plen);
 		if (mcast != 0)
 			if_inc_counter(ifp, IFCOUNTER_OMCASTS, 1);
 	} else
@@ -2592,7 +2593,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	struct ip6_hdr *ip6;
 	const struct in6_addr *srcaddr, *dstaddr;
 	uint16_t srcport, dstport;
-	int len, mcast, error;
+	int plen, len, mcast, error;
 	struct route_in6 route, *ro;
 	struct sockaddr_in6 *sin6;
 	uint32_t csum_flags;
@@ -2605,6 +2606,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	dstaddr = &fvxlsa->in6.sin6_addr;
 	dstport = fvxlsa->in6.sin6_port;
 
+	plen = m->m_pkthdr.len;
 	M_PREPEND(m, sizeof(struct ip6_hdr) + sizeof(struct vxlanudphdr),
 	    M_NOWAIT);
 	if (m == NULL) {
@@ -2688,7 +2690,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	error = ip6_output(m, NULL, ro, 0, sc->vxl_im6o, NULL, NULL);
 	if (error == 0) {
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
-		if_inc_counter(ifp, IFCOUNTER_OBYTES, len);
+		if_inc_counter(ifp, IFCOUNTER_OBYTES, plen);
 		if (mcast != 0)
 			if_inc_counter(ifp, IFCOUNTER_OMCASTS, 1);
 	} else
