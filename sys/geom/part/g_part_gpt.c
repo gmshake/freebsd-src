@@ -551,9 +551,7 @@ gpt_read_tbl(struct g_part_gpt_table *table, struct g_consumer *cp,
 
 	if (hdr == NULL)
 		return (NULL);
-
-	/* XXX change hardcoded 128 to g_part_gpt_scheme.gps_maxent */
-	if (hdr->hdr_entries > 128 ||
+	if (hdr->hdr_entries > g_part_gpt_scheme.gps_maxent ||
 	    hdr->hdr_entsz > MAXENTSIZE) {
 		table->state[elt] = GPT_STATE_UNSUPPORTED;
 		return (NULL);
