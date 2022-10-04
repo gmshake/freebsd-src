@@ -521,11 +521,7 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
 		goto fail;
 
-	if (hdr->hdr_entries > g_part_gpt_scheme.gps_maxent ||
-	    hdr->hdr_entsz > MAXENTSIZE)
-		table->state[elt] = GPT_STATE_UNSUPPORTED;
-	else
-		table->state[elt] = GPT_STATE_OK;
+	table->state[elt] = GPT_STATE_OK;
 	le_uuid_dec(&buf->hdr_uuid, &hdr->hdr_uuid);
 	hdr->hdr_crc_table = le32toh(buf->hdr_crc_table);
 
@@ -555,6 +551,13 @@ gpt_read_tbl(struct g_part_gpt_table *table, struct g_consumer *cp,
 
 	if (hdr == NULL)
 		return (NULL);
+
+	/* XXX change hardcoded 128 to g_part_gpt_scheme.gps_maxent */
+	if (hdr->hdr_entries > 128 ||
+	    hdr->hdr_entsz > MAXENTSIZE) {
+		table->state[elt] = GPT_STATE_UNSUPPORTED;
+		return (NULL);
+	}
 
 	pp = cp->provider;
 	table->lba[elt] = hdr->hdr_lba_table;
@@ -968,12 +971,13 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 	/* Fail if we haven't got any good tables at all. */
 	if (table->state[GPT_ELT_PRITBL] != GPT_STATE_OK &&
 	    table->state[GPT_ELT_SECTBL] != GPT_STATE_OK) {
-		/* XXX arbitrarily report unsupported as the table is not checked */
-		if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_UNSUPPORTED &&
-		    table->state[GPT_ELT_SECHDR] == GPT_STATE_UNSUPPORTED &&
+		if (table->state[GPT_ELT_PRITBL] == GPT_STATE_UNSUPPORTED &&
+		    table->state[GPT_ELT_SECTBL] == GPT_STATE_UNSUPPORTED &&
 		    gpt_matched_hdrs(prihdr, sechdr)) {
 			printf("GEOM: %s: unsupported GPT detected.\n",
 			    pp->name);
+			printf("GEOM: %s: the GPT entry number: %u, entry size :%u.\n",
+			    pp->name, prihdr->hdr_entries, prihdr->hdr_entsz);
 			printf("GEOM: %s: GPT rejected.\n", pp->name);
 		} else {
 			printf("GEOM: %s: corrupt or invalid GPT detected.\n",
