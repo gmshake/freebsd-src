@@ -2504,7 +2504,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	struct ip *ip;
 	struct in_addr srcaddr, dstaddr;
 	uint16_t srcport, dstport;
-	int plen, len, mcast, error;
+	int plen, mcast, error;
 	struct route route, *ro;
 	struct sockaddr_in *sin;
 	uint32_t csum_flags;
@@ -2525,11 +2525,9 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		return (ENOBUFS);
 	}
 
-	len = m->m_pkthdr.len;
-
 	ip = mtod(m, struct ip *);
 	ip->ip_tos = 0;
-	ip->ip_len = htons(len);
+	ip->ip_len = htons(m->m_pkthdr.len);
 	ip->ip_off = 0;
 	ip->ip_ttl = sc->vxl_ttl;
 	ip->ip_p = IPPROTO_UDP;
@@ -2617,7 +2615,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	struct ip6_hdr *ip6;
 	const struct in6_addr *srcaddr, *dstaddr;
 	uint16_t srcport, dstport;
-	int plen, len, mcast, error;
+	int plen, mcast, error;
 	struct route_in6 route, *ro;
 	struct sockaddr_in6 *sin6;
 	uint32_t csum_flags;
@@ -2637,8 +2635,6 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 		return (ENOBUFS);
 	}
-
-	len = m->m_pkthdr.len;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow = 0;		/* BMV: Keep in forwarding entry? */
