@@ -976,7 +976,7 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 			    pp->name);
 			printf("GEOM: %s: GPT entry number: %u, entry size: %u.\n",
 			    pp->name, prihdr->hdr_entries, prihdr->hdr_entsz);
-			printf("GEOM: %s: maximum supported GPT entry number: %u, entry size: %u.\n",
+			printf("GEOM: %s: maximum supported number of GPT entry: %u, entry size: %u.\n",
 			    pp->name, g_part_gpt_scheme.gps_maxent, MAXENTSIZE);
 			printf("GEOM: %s: GPT rejected.\n", pp->name);
 		} else {
