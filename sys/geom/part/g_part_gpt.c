@@ -974,9 +974,9 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		    gpt_matched_hdrs(prihdr, sechdr)) {
 			printf("GEOM: %s: unsupported GPT detected.\n",
 			    pp->name);
-			printf("GEOM: %s: GPT entry number: %u, entry size: %uB.\n",
+			printf("GEOM: %s: number of GPT entries: %u, entry size: %uB.\n",
 			    pp->name, prihdr->hdr_entries, prihdr->hdr_entsz);
-			printf("GEOM: %s: maximum supported number of GPT entry: %u, entry size: %uB.\n",
+			printf("GEOM: %s: maximum supported number of GPT entries: %u, entry size: %uB.\n",
 			    pp->name, g_part_gpt_scheme.gps_maxent, MAXENTSIZE);
 			printf("GEOM: %s: GPT rejected.\n", pp->name);
 		} else {
