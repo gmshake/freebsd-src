@@ -144,9 +144,6 @@ void	gre_update_hdr(struct gre_softc *, struct grehdr *);
 void	gre_update_udphdr(struct gre_softc *, struct udphdr *, uint16_t);
 void	gre_sofree(epoch_context_t);
 
-void	gre_subscribe_rib_event(struct gre_softc *);
-void	gre_unsubscribe_rib_event(struct gre_softc *);
-
 void	in_gre_init(void);
 void	in_gre_uninit(void);
 int	in_gre_setopts(struct gre_softc *, u_long, uint32_t);

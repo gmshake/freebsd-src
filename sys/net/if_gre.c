@@ -232,21 +232,6 @@ gre_clone_destroy(struct ifnet *ifp)
 	free(sc, M_GRE);
 }
 
-void
-gre_subscribe_rib_event(struct gre_softc *sc)
-{
-	if (sc->gre_family != 0)
-		route_cache_subscribe_rib_event(sc->gre_fibnum,
-		    sc->gre_family, &sc->gre_rc);
-}
-
-void
-gre_unsubscribe_rib_event(struct gre_softc *sc)
-{
-	if (sc->gre_rc.rs != NULL)
-		route_cache_unsubscribe_rib_event(&sc->gre_rc);
-}
-
 static int
 gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
@@ -313,9 +298,12 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = EINVAL;
 		else {
 			sc->gre_fibnum = ifr->ifr_fib;
-			gre_unsubscribe_rib_event(sc);
+			if (sc->gre_rc.rs != NULL)
+				route_cache_unsubscribe_rib_event(&sc->gre_rc);
 			route_cache_invalidate(&sc->gre_rc);
-			gre_subscribe_rib_event(sc);
+			if (sc->gre_family != 0)
+				route_cache_subscribe_rib_event(sc->gre_fibnum,
+				    sc->gre_family, &sc->gre_rc);
 		}
 		break;
 	case GRESKEY:
@@ -421,7 +409,8 @@ gre_delete_tunnel(struct gre_softc *sc)
 	struct gre_socket *gs;
 
 	sx_assert(&gre_ioctl_sx, SA_XLOCKED);
-	gre_unsubscribe_rib_event(sc);
+	if (sc->gre_rc.rs != NULL)
+		route_cache_unsubscribe_rib_event(&sc->gre_rc);
 	if (sc->gre_family != 0) {
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);

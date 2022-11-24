@@ -427,7 +427,8 @@ in6_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	}
 	error = in6_gre_attach(sc);
 	if (error != 0) {
-		gre_unsubscribe_rib_event(sc);
+		if (sc->gre_rc.rs != NULL)
+			route_cache_unsubscribe_rib_event(&sc->gre_rc);
 		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
@@ -488,7 +489,8 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		    M_GRE, M_WAITOK | M_ZERO);
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
-		gre_unsubscribe_rib_event(sc);
+		if (sc->gre_rc.rs != NULL)
+			route_cache_unsubscribe_rib_event(&sc->gre_rc);
 		if (sc->gre_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, chain);
@@ -507,7 +509,8 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			sc->gre_family = 0;
 			free(sc->gre_hdr, M_GRE);
 		} else
-			gre_subscribe_rib_event(sc);
+			route_cache_subscribe_rib_event(sc->gre_fibnum,
+			    sc->gre_family, &sc->gre_rc);
 		break;
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
