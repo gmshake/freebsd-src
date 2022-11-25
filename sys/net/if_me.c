@@ -337,8 +337,8 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			route_cache_unsubscribe_rib_event(&sc->me_rc);
 			route_cache_invalidate(&sc->me_rc);
 			if (ME_READY(sc))
-				route_cache_subscribe_rib_event(sc->me_fibnum,
-				    AF_INET, &sc->me_rc);
+				route_cache_subscribe_rib_event(&sc->me_rc,
+				    AF_INET, sc->me_fibnum);
 		}
 		break;
 	default:
@@ -445,7 +445,7 @@ me_set_tunnel(struct me_softc *sc, in_addr_t src, in_addr_t dst)
 	NET_EPOCH_ENTER(et);
 	me_set_running(sc);
 	NET_EPOCH_EXIT(et);
-	route_cache_subscribe_rib_event(sc->me_fibnum, AF_INET, &sc->me_rc);
+	route_cache_subscribe_rib_event(&sc->me_rc, AF_INET, sc->me_fibnum);
 	if_link_state_change(ME2IFP(sc), LINK_STATE_UP);
 	return (0);
 }

@@ -265,8 +265,8 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		sc->gif_ip6hdr = ip6;
 		in6_gif_attach(sc);
 		in6_gif_set_running(sc);
-		route_cache_subscribe_rib_event(sc->gif_fibnum,
-		    sc->gif_family, &sc->gif_rc);
+		route_cache_subscribe_rib_event(&sc->gif_rc, sc->gif_family,
+		    sc->gif_fibnum);
 		break;
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:

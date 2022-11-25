@@ -143,8 +143,8 @@ route_cache_subscription_cb(struct rib_head *rnh __unused,
 }
 
 void
-route_cache_subscribe_rib_event(uint32_t fibnum, int family,
-    struct route_cache *rc)
+route_cache_subscribe_rib_event(struct route_cache *rc, int family,
+    uint32_t fibnum)
 {
 	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
 	rc->rs = rib_subscribe(fibnum, family, route_cache_subscription_cb,

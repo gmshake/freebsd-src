@@ -655,8 +655,8 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			route_cache_unsubscribe_rib_event(&sc->gif_rc);
 			route_cache_invalidate(&sc->gif_rc);
 			if (sc->gif_family != 0)
-				route_cache_subscribe_rib_event(sc->gif_fibnum,
-				    sc->gif_family, &sc->gif_rc);
+				route_cache_subscribe_rib_event(&sc->gif_rc,
+				    sc->gif_family, sc->gif_fibnum);
 		}
 		break;
 	case GIFGOPTS:

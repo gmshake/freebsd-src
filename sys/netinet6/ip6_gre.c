@@ -507,8 +507,8 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			sc->gre_family = 0;
 			free(sc->gre_hdr, M_GRE);
 		} else
-			route_cache_subscribe_rib_event(sc->gre_fibnum,
-			    sc->gre_family, &sc->gre_rc);
+			route_cache_subscribe_rib_event(&sc->gre_rc,
+			    sc->gre_family, sc->gre_fibnum);
 		break;
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:

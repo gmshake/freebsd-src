@@ -301,8 +301,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			route_cache_unsubscribe_rib_event(&sc->gre_rc);
 			route_cache_invalidate(&sc->gre_rc);
 			if (sc->gre_family != 0)
-				route_cache_subscribe_rib_event(sc->gre_fibnum,
-				    sc->gre_family, &sc->gre_rc);
+				route_cache_subscribe_rib_event(&sc->gre_rc,
+				    sc->gre_family, sc->gre_fibnum);
 		}
 		break;
 	case GRESKEY:

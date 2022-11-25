@@ -252,8 +252,8 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		NET_EPOCH_ENTER(et);
 		in_gif_set_running(sc);
 		NET_EPOCH_EXIT(et);
-		route_cache_subscribe_rib_event(sc->gif_fibnum,
-		    sc->gif_family, &sc->gif_rc);
+		route_cache_subscribe_rib_event(&sc->gif_rc, sc->gif_family,
+		    sc->gif_fibnum);
 		break;
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:
