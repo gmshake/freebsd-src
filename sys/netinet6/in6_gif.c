@@ -295,7 +295,7 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 {
 	struct gif_softc *sc = ifp->if_softc;
 	struct ip6_hdr *ip6;
-	struct route_in6 *ro6;
+	struct route_in6 *ro;
 	int len;
 	int error;
 
@@ -327,14 +327,14 @@ in6_gif_output(struct ifnet *ifp, struct mbuf *m, int proto, uint8_t ecn)
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= V_ip6_gif_hlim;
 
-	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gif_rc);
+	ro = route_cache_acquire6(&sc->gif_rc);
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	error = ip6_output(m, 0, ro6, IPV6_MINMTU, 0, NULL, NULL);
-	route_cache_release((struct route *)ro6);
+	error = ip6_output(m, 0, ro, IPV6_MINMTU, 0, NULL, NULL);
+	route_cache_release6(ro);
 	return (error);
 }
 

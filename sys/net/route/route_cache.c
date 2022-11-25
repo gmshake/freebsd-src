@@ -94,13 +94,13 @@ route_cache_init(struct route_cache *rc)
 	int cpu;
 	struct route_cache_entry *e;
 	struct route_cache_entry *pcpu_rce = uma_zalloc_pcpu(pcpu_route_cache_entry_zone, M_WAITOK | M_ZERO);
-	critical_enter();
+	//critical_enter();
 	CPU_FOREACH(cpu) {
 		e = zpcpu_get_cpu(pcpu_rce, cpu);
 		e->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 		mtx_init(&e->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
 	}
-	critical_exit();
+	//critical_exit();
 	rc->rce = pcpu_rce;
 	rc->rs = NULL;
 }
@@ -112,15 +112,19 @@ route_cache_uninit(struct route_cache *rc)
 	struct route_cache_entry *e;
 	CPU_FOREACH(cpu) {
 		e = zpcpu_get_cpu(rc->rce, cpu);
+#ifdef INVARIANTS
 		mtx_lock(&e->rt_mtx);
-		RO_INVALIDATE_CACHE(&e->ro);
+		KASSERT((e->ro.ro_nh == NULL), ("route nexthop cache is not freed"));
+		KASSERT((e->ro.ro_lle == NULL), ("route llentry is not freed"));
 		mtx_unlock(&e->rt_mtx);
+#endif
 		mtx_destroy(&e->rt_mtx);
 	}
 	uma_zfree_pcpu(pcpu_route_cache_entry_zone, rc->rce);
 	rc->rce = NULL; /* XXX change to 0xdeadc0de */
 }
 
+// XXX invalid cache via smp_rendezvous() ?
 void
 route_cache_invalidate(struct route_cache *rc)
 {

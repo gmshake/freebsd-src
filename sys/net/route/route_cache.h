@@ -30,6 +30,9 @@
 #ifndef _NET_ROUTE_ROUTE_CACHE_H_
 #define _NET_ROUTE_ROUTE_CACHE_H_
 
+#include "opt_inet.h"
+#include "opt_inet6.h"
+
 VNET_DECLARE(u_int, route_cache);
 #define V_route_cache VNET(route_cache)
 
@@ -52,13 +55,6 @@ struct route_cache_entry {
 	};
 } __aligned(CACHE_LINE_SIZE);
 
-#define route2cache_entry(r)		__containerof((r), struct route_cache_entry, ro)
-
-#define ROUTE_CACHE_LOCK(p)	mtx_lock(&(p)->rt_mtx)
-#define ROUTE_CACHE_TRYLOCK(p)	mtx_trylock(&(p)->rt_mtx)
-#define ROUTE_CACHE_UNLOCK(p)	mtx_unlock(&(p)->rt_mtx)
-#define ROUTE_CACHE_LOCK_ASSERT(p)	mtx_assert(&(p)->rt_mtx, MA_OWNED)
-#define ROUTE_CACHE_GET(p)	zpcpu_get((p))
 
 void route_cache_init(struct route_cache *);
 void route_cache_uninit(struct route_cache *);
@@ -67,6 +63,7 @@ void route_cache_invalidate(struct route_cache *);
 void route_cache_subscribe_rib_event(struct route_cache *, int, uint32_t);
 void route_cache_unsubscribe_rib_event(struct route_cache *);
 
+#ifdef INET
 static inline struct route *
 route_cache_acquire(struct route_cache *rc)
 {
@@ -74,8 +71,8 @@ route_cache_acquire(struct route_cache *rc)
 	struct route *ro = NULL;
 
 	if (V_route_cache) {
-		rce = ROUTE_CACHE_GET(rc->rce);
-		if (ROUTE_CACHE_TRYLOCK(rce))
+		rce = zpcpu_get(rc->rce);
+		if (mtx_trylock(&rce->rt_mtx))
 			ro = &rce->ro;
 	}
 
@@ -88,10 +85,40 @@ route_cache_release(struct route *ro)
 	struct route_cache_entry *rce;
 
 	if (ro != NULL) {
-		rce = route2cache_entry(ro);
-		ROUTE_CACHE_LOCK_ASSERT(rce);
-		ROUTE_CACHE_UNLOCK(rce);
+		rce = __containerof(ro, struct route_cache_entry, ro);
+		mtx_assert(&rce->rt_mtx, MA_OWNED);
+		mtx_unlock(&rce->rt_mtx);
 	}
 }
+#endif
+
+#ifdef INET6
+static inline struct route_in6 *
+route_cache_acquire6(struct route_cache *rc)
+{
+	struct route_cache_entry *rce;
+	struct route_in6 *ro = NULL;
+
+	if (V_route_cache) {
+		rce = zpcpu_get(rc->rce);
+		if (mtx_trylock(&rce->rt_mtx))
+			ro = &rce->ro6;
+	}
+
+	return ro;
+}
+
+static inline void
+route_cache_release6(struct route_in6 *ro)
+{
+	struct route_cache_entry *rce;
+
+	if (ro != NULL) {
+		rce = __containerof(ro, struct route_cache_entry, ro6);
+		mtx_assert(&rce->rt_mtx, MA_OWNED);
+		mtx_unlock(&rce->rt_mtx);
+	}
+}
+#endif
 
 #endif

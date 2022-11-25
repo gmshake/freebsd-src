@@ -538,16 +538,16 @@ in6_gre_output(struct ifnet *ifp, struct mbuf *m, int af __unused,
 {
 	struct gre_softc *sc = ifp->if_softc;
 	struct greip6 *gi6;
-	struct route_in6 *ro6;
+	struct route_in6 *ro;
 	int error;
 
 	gi6 = mtod(m, struct greip6 *);
 	gi6->gi6_ip6.ip6_hlim = V_ip6_gre_hlim;
 	gi6->gi6_ip6.ip6_flow |= flowid & IPV6_FLOWLABEL_MASK;
 
-	ro6 = (struct route_in6 *)route_cache_acquire(&sc->gre_rc);
-	error = ip6_output(m, NULL, ro6, IPV6_MINMTU, NULL, NULL, NULL);
-	route_cache_release((struct route *)ro6);
+	ro = route_cache_acquire6(&sc->gre_rc);
+	error = ip6_output(m, NULL, ro, IPV6_MINMTU, NULL, NULL, NULL);
+	route_cache_release6(ro);
 	return (error);
 }
 
