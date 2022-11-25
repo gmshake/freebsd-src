@@ -727,8 +727,8 @@ gif_delete_tunnel(struct gif_softc *sc)
 		GIF_WAIT();
 		free(sc->gif_hdr, M_GIF);
 		route_cache_invalidate(&sc->gif_rc);
+		sc->gif_family = 0;
 	}
-	sc->gif_family = 0;
 	GIF2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 	if_link_state_change(GIF2IFP(sc), LINK_STATE_DOWN);
 }
