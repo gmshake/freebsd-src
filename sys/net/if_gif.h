@@ -109,9 +109,6 @@ void gif_input(struct mbuf *, struct ifnet *, int, uint8_t);
 int gif_output(struct ifnet *, struct mbuf *, const struct sockaddr *,
 	       struct route *);
 
-void gif_subscribe_rib_event(struct gif_softc *);
-void gif_unsubscribe_rib_event(struct gif_softc *);
-
 void in_gif_init(void);
 void in_gif_uninit(void);
 int in_gif_output(struct ifnet *, struct mbuf *, int, uint8_t);

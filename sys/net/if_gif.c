@@ -591,21 +591,6 @@ drop:
 	if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
 }
 
-void
-gif_subscribe_rib_event(struct gif_softc *sc)
-{
-	if (sc->gif_family != 0)
-		route_cache_subscribe_rib_event(sc->gif_fibnum,
-		    sc->gif_family, &sc->gif_rc);
-}
-
-void
-gif_unsubscribe_rib_event(struct gif_softc *sc)
-{
-	if (sc->gif_rc.rs != NULL)
-		route_cache_unsubscribe_rib_event(&sc->gif_rc);
-}
-
 static int
 gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
@@ -665,11 +650,13 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else {
+		else if (ifr->ifr_fib != sc->gif_fibnum) {
 			sc->gif_fibnum = ifr->ifr_fib;
-			gif_unsubscribe_rib_event(sc);
+			route_cache_unsubscribe_rib_event(&sc->gif_rc);
 			route_cache_invalidate(&sc->gif_rc);
-			gif_subscribe_rib_event(sc);
+			if (sc->gif_family != 0)
+				route_cache_subscribe_rib_event(sc->gif_fibnum,
+				    sc->gif_family, &sc->gif_rc);
 		}
 		break;
 	case GIFGOPTS:
@@ -732,7 +719,7 @@ gif_delete_tunnel(struct gif_softc *sc)
 {
 
 	sx_assert(&gif_ioctl_sx, SA_XLOCKED);
-	gif_unsubscribe_rib_event(sc);
+	route_cache_unsubscribe_rib_event(&sc->gif_rc);
 	if (sc->gif_family != 0) {
 		CK_LIST_REMOVE(sc, srchash);
 		CK_LIST_REMOVE(sc, chain);
