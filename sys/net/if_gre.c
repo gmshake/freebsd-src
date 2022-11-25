@@ -296,10 +296,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else {
+		else if (ifr->ifr_fib != sc->gre_fibnum) {
 			sc->gre_fibnum = ifr->ifr_fib;
-			if (sc->gre_rc.rs != NULL)
-				route_cache_unsubscribe_rib_event(&sc->gre_rc);
+			route_cache_unsubscribe_rib_event(&sc->gre_rc);
 			route_cache_invalidate(&sc->gre_rc);
 			if (sc->gre_family != 0)
 				route_cache_subscribe_rib_event(sc->gre_fibnum,
@@ -409,8 +408,7 @@ gre_delete_tunnel(struct gre_softc *sc)
 	struct gre_socket *gs;
 
 	sx_assert(&gre_ioctl_sx, SA_XLOCKED);
-	if (sc->gre_rc.rs != NULL)
-		route_cache_unsubscribe_rib_event(&sc->gre_rc);
+	route_cache_unsubscribe_rib_event(&sc->gre_rc);
 	if (sc->gre_family != 0) {
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);
