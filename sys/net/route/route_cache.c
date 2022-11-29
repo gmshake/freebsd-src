@@ -99,7 +99,7 @@ route_cache_init(struct route_cache *rc)
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc_pcpu, cpu);
 		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
-		mtx_init(&e->rt_mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
+		mtx_init(&pcpu->rt_mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
 	}
 	//critical_exit();
 	rc->rc_pcpu = rc_pcpu;
