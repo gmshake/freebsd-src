@@ -36,14 +36,14 @@
 VNET_DECLARE(u_int, route_cache);
 #define V_route_cache VNET(route_cache)
 
-struct route_cache_entry;
+struct route_cache_pcpu;
 
 struct route_cache {
-	struct route_cache_entry	*rce; /* pcpu route cache */
-	struct rib_subscription		*rs;
+	struct route_cache_pcpu *rc_pcpu;
+	struct rib_subscription *rs;
 };
 
-struct route_cache_entry {
+struct route_cache_pcpu {
 	struct mtx rt_mtx;
 	union {
 #ifdef INET
@@ -67,13 +67,13 @@ void route_cache_unsubscribe_rib_event(struct route_cache *);
 static inline struct route *
 route_cache_acquire(struct route_cache *rc)
 {
-	struct route_cache_entry *rce;
+	struct route_cache_pcpu *pcpu;
 	struct route *ro = NULL;
 
 	if (V_route_cache) {
-		rce = zpcpu_get(rc->rce);
-		if (mtx_trylock(&rce->rt_mtx))
-			ro = &rce->ro;
+		pcpu = zpcpu_get(rc->rc_pcpu);
+		if (mtx_trylock(&pcpu->rt_mtx))
+			ro = &pcpu->ro;
 	}
 
 	return ro;
@@ -82,12 +82,12 @@ route_cache_acquire(struct route_cache *rc)
 static inline void
 route_cache_release(struct route *ro)
 {
-	struct route_cache_entry *rce;
+	struct route_cache_pcpu *pcpu;
 
 	if (ro != NULL) {
-		rce = __containerof(ro, struct route_cache_entry, ro);
-		mtx_assert(&rce->rt_mtx, MA_OWNED);
-		mtx_unlock(&rce->rt_mtx);
+		pcpu = __containerof(ro, struct route_cache_pcpu, ro);
+		mtx_assert(&pcpu->rt_mtx, MA_OWNED);
+		mtx_unlock(&pcpu->rt_mtx);
 	}
 }
 #endif
@@ -96,13 +96,13 @@ route_cache_release(struct route *ro)
 static inline struct route_in6 *
 route_cache_acquire6(struct route_cache *rc)
 {
-	struct route_cache_entry *rce;
+	struct route_cache_pcpu *pcpu;
 	struct route_in6 *ro = NULL;
 
 	if (V_route_cache) {
-		rce = zpcpu_get(rc->rce);
-		if (mtx_trylock(&rce->rt_mtx))
-			ro = &rce->ro6;
+		pcpu = zpcpu_get(rc->rc_pcpu);
+		if (mtx_trylock(&pcpu->rt_mtx))
+			ro = &pcpu->ro6;
 	}
 
 	return ro;
@@ -111,12 +111,12 @@ route_cache_acquire6(struct route_cache *rc)
 static inline void
 route_cache_release6(struct route_in6 *ro)
 {
-	struct route_cache_entry *rce;
+	struct route_cache_pcpu *pcpu;
 
 	if (ro != NULL) {
-		rce = __containerof(ro, struct route_cache_entry, ro6);
-		mtx_assert(&rce->rt_mtx, MA_OWNED);
-		mtx_unlock(&rce->rt_mtx);
+		pcpu = __containerof(ro, struct route_cache_pcpu, ro6);
+		mtx_assert(&pcpu->rt_mtx, MA_OWNED);
+		mtx_unlock(&pcpu->rt_mtx);
 	}
 }
 #endif

@@ -66,42 +66,43 @@ SYSCTL_DECL(_net_route);
 SYSCTL_UINT(_net_route, OID_AUTO, cache, CTLFLAG_RW | CTLFLAG_VNET,
     &VNET_NAME(route_cache), 0, "Enable route cache");
 
-static uma_zone_t pcpu_route_cache_entry_zone;
+static uma_zone_t route_cache_pcpu_zone;
 
 static void
-route_cache_entry_zone_init(void)
+route_cache_pcpu_zone_init(void)
 {
-	pcpu_route_cache_entry_zone = uma_zcreate("pcpu-route-cache-entry",
-	    sizeof(struct route_cache_entry), NULL, NULL, NULL, NULL,
+	route_cache_pcpu_zone = uma_zcreate("route-cache-pcpu",
+	    sizeof(struct route_cache_pcpu), NULL, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, UMA_ZONE_PCPU);
 }
 
-SYSINIT(route_cache_entry_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
-    route_cache_entry_zone_init, NULL);
+SYSINIT(route_cache_pcpu_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
+    route_cache_pcpu_zone_init, NULL);
 
 static void
-route_cache_entry_zone_uninit(void)
+route_cache_pcpu_zone_uninit(void)
 {
-	uma_zdestroy(pcpu_route_cache_entry_zone);
+	uma_zdestroy(route_cache_pcpu_zone);
 }
 
-SYSUNINIT(route_cache_entry_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
-    route_cache_entry_zone_uninit, NULL);
+SYSUNINIT(route_cache_pcpu_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
+    route_cache_pcpu_zone_uninit, NULL);
 
 void
 route_cache_init(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache_entry *e;
-	struct route_cache_entry *pcpu_rce = uma_zalloc_pcpu(pcpu_route_cache_entry_zone, M_WAITOK | M_ZERO);
+	struct route_cache_pcpu *pcpu;
+	struct route_cache_pcpu *rc_pcpu = uma_zalloc_pcpu(route_cache_pcpu_zone,
+	    M_WAITOK | M_ZERO);
 	//critical_enter();
 	CPU_FOREACH(cpu) {
-		e = zpcpu_get_cpu(pcpu_rce, cpu);
-		e->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
-		mtx_init(&e->rt_mtx, "cache_route_mtx", NULL, MTX_DEF);
+		pcpu = zpcpu_get_cpu(rc_pcpu, cpu);
+		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
+		mtx_init(&e->rt_mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
 	}
 	//critical_exit();
-	rc->rce = pcpu_rce;
+	rc->rc_pcpu = rc_pcpu;
 	rc->rs = NULL;
 }
 
@@ -109,19 +110,19 @@ void
 route_cache_uninit(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache_entry *e;
+	struct route_cache_pcpu *pcpu;
 	CPU_FOREACH(cpu) {
-		e = zpcpu_get_cpu(rc->rce, cpu);
+		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
 #ifdef INVARIANTS
-		mtx_lock(&e->rt_mtx);
-		KASSERT((e->ro.ro_nh == NULL), ("route nexthop cache is not freed"));
-		KASSERT((e->ro.ro_lle == NULL), ("route llentry is not freed"));
-		mtx_unlock(&e->rt_mtx);
+		mtx_lock(&pcpu->rt_mtx);
+		KASSERT((pcpu->ro.ro_nh == NULL), ("route nexthop cache is not freed"));
+		KASSERT((pcpu->ro.ro_lle == NULL), ("route llentry is not freed"));
+		mtx_unlock(&pcpu->rt_mtx);
 #endif
-		mtx_destroy(&e->rt_mtx);
+		mtx_destroy(&pcpu->rt_mtx);
 	}
-	uma_zfree_pcpu(pcpu_route_cache_entry_zone, rc->rce);
-	rc->rce = NULL; /* XXX change to 0xdeadc0de */
+	uma_zfree_pcpu(route_cache_pcpu_zone, rc->rc_pcpu);
+	rc->rc_pcpu = NULL; /* XXX 0xdeadc0de ? */
 }
 
 // XXX invalid cache via smp_rendezvous() ?
@@ -129,12 +130,12 @@ void
 route_cache_invalidate(struct route_cache *rc)
 {
 	int cpu;
-	struct route_cache_entry *e;
+	struct route_cache_pcpu *pcpu;
 	CPU_FOREACH(cpu) {
-		e = zpcpu_get_cpu(rc->rce, cpu);
-		mtx_lock(&e->rt_mtx);
-		RO_INVALIDATE_CACHE(&e->ro);
-		mtx_unlock(&e->rt_mtx);
+		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
+		mtx_lock(&pcpu->rt_mtx);
+		RO_INVALIDATE_CACHE(&pcpu->ro);
+		mtx_unlock(&pcpu->rt_mtx);
 	}
 }
 
