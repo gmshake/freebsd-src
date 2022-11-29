@@ -44,7 +44,7 @@ struct route_cache {
 };
 
 struct route_cache_pcpu {
-	struct mtx rt_mtx;
+	struct mtx mtx;
 	union {
 #ifdef INET
 		struct route     ro;
@@ -72,7 +72,7 @@ route_cache_acquire(struct route_cache *rc)
 
 	if (V_route_cache) {
 		pcpu = zpcpu_get(rc->rc_pcpu);
-		if (mtx_trylock(&pcpu->rt_mtx))
+		if (mtx_trylock(&pcpu->mtx))
 			ro = &pcpu->ro;
 	}
 
@@ -86,8 +86,8 @@ route_cache_release(struct route *ro)
 
 	if (ro != NULL) {
 		pcpu = __containerof(ro, struct route_cache_pcpu, ro);
-		mtx_assert(&pcpu->rt_mtx, MA_OWNED);
-		mtx_unlock(&pcpu->rt_mtx);
+		mtx_assert(&pcpu->mtx, MA_OWNED);
+		mtx_unlock(&pcpu->mtx);
 	}
 }
 #endif
@@ -101,7 +101,7 @@ route_cache_acquire6(struct route_cache *rc)
 
 	if (V_route_cache) {
 		pcpu = zpcpu_get(rc->rc_pcpu);
-		if (mtx_trylock(&pcpu->rt_mtx))
+		if (mtx_trylock(&pcpu->mtx))
 			ro = &pcpu->ro6;
 	}
 
@@ -115,8 +115,8 @@ route_cache_release6(struct route_in6 *ro)
 
 	if (ro != NULL) {
 		pcpu = __containerof(ro, struct route_cache_pcpu, ro6);
-		mtx_assert(&pcpu->rt_mtx, MA_OWNED);
-		mtx_unlock(&pcpu->rt_mtx);
+		mtx_assert(&pcpu->mtx, MA_OWNED);
+		mtx_unlock(&pcpu->mtx);
 	}
 }
 #endif

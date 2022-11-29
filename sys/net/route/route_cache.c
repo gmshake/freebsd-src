@@ -99,7 +99,7 @@ route_cache_init(struct route_cache *rc)
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc_pcpu, cpu);
 		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
-		mtx_init(&pcpu->rt_mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
+		mtx_init(&pcpu->mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
 	}
 	//critical_exit();
 	rc->rc_pcpu = rc_pcpu;
@@ -114,12 +114,12 @@ route_cache_uninit(struct route_cache *rc)
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
 #ifdef INVARIANTS
-		mtx_lock(&pcpu->rt_mtx);
+		mtx_lock(&pcpu->mtx);
 		KASSERT((pcpu->ro.ro_nh == NULL), ("route nexthop cache is not freed"));
 		KASSERT((pcpu->ro.ro_lle == NULL), ("route llentry is not freed"));
-		mtx_unlock(&pcpu->rt_mtx);
+		mtx_unlock(&pcpu->mtx);
 #endif
-		mtx_destroy(&pcpu->rt_mtx);
+		mtx_destroy(&pcpu->mtx);
 	}
 	uma_zfree_pcpu(route_cache_pcpu_zone, rc->rc_pcpu);
 	rc->rc_pcpu = NULL; /* XXX 0xdeadc0de ? */
@@ -133,9 +133,9 @@ route_cache_invalidate(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
-		mtx_lock(&pcpu->rt_mtx);
+		mtx_lock(&pcpu->mtx);
 		RO_INVALIDATE_CACHE(&pcpu->ro);
-		mtx_unlock(&pcpu->rt_mtx);
+		mtx_unlock(&pcpu->mtx);
 	}
 }
 
