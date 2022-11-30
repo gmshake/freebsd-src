@@ -117,6 +117,7 @@ route_cache_uninit(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
+		mtx_assert(&pcpu->mtx, MA_NOTOWNED);
 #ifdef INVARIANTS
 		mtx_lock(&pcpu->mtx);
 #ifdef INET
