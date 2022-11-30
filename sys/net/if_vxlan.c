@@ -79,6 +79,8 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #include <netinet6/scope6_var.h>
 
+#include <net/route/route_cache.h>
+
 struct vxlan_softc;
 LIST_HEAD(vxlan_softc_head, vxlan_softc);
 
@@ -206,6 +208,7 @@ struct vxlan_softc {
 	struct ifnet			*vxl_mc_ifp;
 	struct ifmedia 			 vxl_media;
 	char				 vxl_mc_ifname[IFNAMSIZ];
+	struct route_cache               vxl_rc;
 	LIST_ENTRY(vxlan_softc)		 vxl_entry;
 	LIST_ENTRY(vxlan_softc)		 vxl_ifdetach_list;
 
@@ -1709,6 +1712,9 @@ vxlan_init_complete(struct vxlan_softc *sc)
 
 	VXLAN_WLOCK(sc);
 	sc->vxl_flags &= ~VXLAN_FLAG_INIT;
+	if (VXLAN_SOCKADDR_IS_IPV46(&sc->vxl_dst_addr))
+		route_cache_subscribe_rib_event(&sc->vxl_rc,
+		    sc->vxl_dst_addr.sa.sa_family, sc->vxl_fibnum);
 	wakeup(sc);
 	VXLAN_WUNLOCK(sc);
 }
@@ -1805,6 +1811,7 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	VXLAN_LOCK_WASSERT(sc);
 	MPASS(sc->vxl_flags & VXLAN_FLAG_TEARDOWN);
 
+	route_cache_unsubscribe_rib_event(&sc->vxl_rc);
 	ifp = sc->vxl_ifp;
 	ifp->if_flags &= ~IFF_UP;
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -1813,6 +1820,7 @@ vxlan_teardown_locked(struct vxlan_softc *sc)
 	sc->vxl_sock = NULL;
 
 	VXLAN_WUNLOCK(sc);
+	route_cache_invalidate(&sc->vxl_rc);
 	if_link_state_change(ifp, LINK_STATE_DOWN);
 	EVENTHANDLER_INVOKE(vxlan_stop, ifp, sc->vxl_src_addr.in4.sin_family,
 	    ntohs(sc->vxl_src_addr.in4.sin_port));
@@ -2395,7 +2403,14 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = EINVAL;
 		else {
 			VXLAN_WLOCK(sc);
-			sc->vxl_fibnum = ifr->ifr_fib;
+			if (ifr->ifr_fib != sc->vxl_fibnum) {
+				sc->vxl_fibnum = ifr->ifr_fib;
+				route_cache_unsubscribe_rib_event(&sc->vxl_rc);
+				route_cache_invalidate(&sc->vxl_rc);
+				if (VXLAN_SOCKADDR_IS_IPV46(&sc->vxl_dst_addr))
+					route_cache_subscribe_rib_event(&sc->vxl_rc,
+					    sc->vxl_dst_addr.sa.sa_family, sc->vxl_fibnum);
+			}
 			VXLAN_WUNLOCK(sc);
 		}
 		break;
@@ -2541,6 +2556,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	m->m_flags &= ~(M_MCAST | M_BCAST);
 
 	m->m_pkthdr.csum_flags &= CSUM_FLAGS_TX;
+	ro = route_cache_acquire(&sc->vxl_rc);
 	if (m->m_pkthdr.csum_flags != 0) {
 		/*
 		 * HW checksum (L3 and/or L4) or TSO has been requested.  Look
@@ -2548,18 +2564,29 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		 * outbound ifnet can perform the requested operation on the
 		 * inner frame.
 		 */
-		bzero(&route, sizeof(route));
-		ro = &route;
-		sin = (struct sockaddr_in *)&ro->ro_dst;
-		sin->sin_family = AF_INET;
-		sin->sin_len = sizeof(*sin);
-		sin->sin_addr = ip->ip_dst;
-		ro->ro_nh = fib4_lookup(M_GETFIB(m), ip->ip_dst, 0, NHR_NONE,
-		    0);
+		if (ro == NULL ) {
+			bzero(&route, sizeof(route));
+			ro = &route;
+		} else if (ro->ro_nh != NULL &&
+		            ((!NH_IS_VALID(ro->ro_nh)) || ro->ro_dst.sa_family != AF_INET ||
+			    ((struct sockaddr_in *)&ro->ro_dst)->sin_addr.s_addr != ip->ip_dst.s_addr))
+				RO_INVALIDATE_CACHE(ro);
+
 		if (ro->ro_nh == NULL) {
-			m_freem(m);
-			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-			return (EHOSTUNREACH);
+			sin = (struct sockaddr_in *)&ro->ro_dst;
+			sin->sin_family = AF_INET;
+			sin->sin_len = sizeof(*sin);
+			sin->sin_addr = ip->ip_dst;
+			ro->ro_nh = fib4_lookup(M_GETFIB(m), ip->ip_dst, 0,
+			    ro != &route ? NHR_REF : NHR_NONE, 0);
+
+			if (ro->ro_nh == NULL) {
+				m_freem(m);
+				if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
+				if (ro != &route)
+					route_cache_release(ro);
+				return (EHOSTUNREACH);
+			}
 		}
 
 		csum_flags = csum_flags_to_inner_flags(m->m_pkthdr.csum_flags,
@@ -2578,6 +2605,8 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 			}
 			m_freem(m);
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
+			if (ro != &route)
+				route_cache_release(ro);
 			return (ENXIO);
 		}
 		m->m_pkthdr.csum_flags = csum_flags;
@@ -2588,9 +2617,10 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 			if (csum_flags & CSUM_INNER_TSO)
 				counter_u64_add(sc->vxl_stats.tso, 1);
 		}
-	} else
-		ro = NULL;
+	}
 	error = ip_output(m, NULL, ro, 0, sc->vxl_im4o, NULL);
+	if (ro != &route)
+		route_cache_release(ro);
 	if (error == 0) {
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
 		if_inc_counter(ifp, IFCOUNTER_OBYTES, plen);
@@ -2650,8 +2680,8 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	mcast = (m->m_flags & (M_MCAST | M_BCAST)) ? 1 : 0;
 	m->m_flags &= ~(M_MCAST | M_BCAST);
 
-	ro = NULL;
 	m->m_pkthdr.csum_flags &= CSUM_FLAGS_TX;
+	ro = route_cache_acquire6(&sc->vxl_rc);
 	if (m->m_pkthdr.csum_flags != 0) {
 		/*
 		 * HW checksum (L3 and/or L4) or TSO has been requested.  Look
@@ -2659,18 +2689,29 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		 * outbound ifnet can perform the requested operation on the
 		 * inner frame.
 		 */
-		bzero(&route, sizeof(route));
-		ro = &route;
-		sin6 = (struct sockaddr_in6 *)&ro->ro_dst;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_len = sizeof(*sin6);
-		sin6->sin6_addr = ip6->ip6_dst;
-		ro->ro_nh = fib6_lookup(M_GETFIB(m), &ip6->ip6_dst, 0,
-		    NHR_NONE, 0);
+		if (ro == NULL ) {
+			bzero(&route, sizeof(route));
+			ro = &route;
+		} else if (ro->ro_nh != NULL &&
+		    (!NH_IS_VALID(ro->ro_nh) ||
+		    ro->ro_dst.sin6_family != AF_INET6 ||
+		    !IN6_ARE_ADDR_EQUAL(&ro->ro_dst.sin6_addr, &ip6->ip6_dst)))
+			RO_INVALIDATE_CACHE(ro);
+
 		if (ro->ro_nh == NULL) {
-			m_freem(m);
-			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-			return (EHOSTUNREACH);
+			sin6 = (struct sockaddr_in6 *)&ro->ro_dst;
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_addr = ip6->ip6_dst;
+			ro->ro_nh = fib6_lookup(M_GETFIB(m), &ip6->ip6_dst, 0,
+			    ro != &route ? NHR_REF : NHR_NONE, 0);
+			if (ro->ro_nh == NULL) {
+				m_freem(m);
+				if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
+				if (ro != &route)
+					route_cache_release6(ro);
+				return (EHOSTUNREACH);
+			}
 		}
 
 		csum_flags = csum_flags_to_inner_flags(m->m_pkthdr.csum_flags,
@@ -2689,6 +2730,8 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 			}
 			m_freem(m);
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
+			if (ro != &route)
+				route_cache_release6(ro);
 			return (ENXIO);
 		}
 		m->m_pkthdr.csum_flags = csum_flags;
@@ -2708,6 +2751,8 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		m->m_pkthdr.csum_data = offsetof(struct udphdr, uh_sum);
 	}
 	error = ip6_output(m, NULL, ro, 0, sc->vxl_im6o, NULL, NULL);
+	if (ro != &route)
+		route_cache_release(ro);
 	if (error == 0) {
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
 		if_inc_counter(ifp, IFCOUNTER_OBYTES, plen);
@@ -3264,6 +3309,7 @@ vxlan_clone_create(struct if_clone *ifc, char *name, size_t len,
 	VXLAN_WLOCK(sc);
 	vxlan_setup_interface_hdrlen(sc);
 	VXLAN_WUNLOCK(sc);
+	route_cache_init(&sc->vxl_rc);
 	*ifpp = ifp;
 
 	return (0);
@@ -3293,6 +3339,7 @@ vxlan_clone_destroy(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 	vxlan_sysctl_destroy(sc);
 	rm_destroy(&sc->vxl_lock);
 	vxlan_stats_free(sc);
+	route_cache_uninit(&sc->vxl_rc);
 	free(sc, M_VXLAN);
 
 	return (0);
