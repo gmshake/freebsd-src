@@ -89,6 +89,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_encap.h>
 #include <netinet/udp.h>
 #include <net/bpf.h>
+#include <net/route/route_cache.h>
 #include <net/if_gre.h>
 
 #include <machine/in_cksum.h>
@@ -175,6 +176,7 @@ gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gre_softc *sc;
 
 	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK | M_ZERO);
+	route_cache_init(&sc->gre_rc);
 	sc->gre_fibnum = curthread->td_proc->p_fibnum;
 	GRE2IFP(sc) = if_alloc(IFT_TUNNEL);
 	GRE2IFP(sc)->if_softc = sc;
@@ -226,6 +228,7 @@ gre_clone_destroy(struct ifnet *ifp)
 
 	GRE_WAIT();
 	if_free(ifp);
+	route_cache_uninit(&sc->gre_rc);
 	free(sc, M_GRE);
 }
 
@@ -293,8 +296,14 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else if (ifr->ifr_fib != sc->gre_fibnum) {
 			sc->gre_fibnum = ifr->ifr_fib;
+			route_cache_unsubscribe_rib_event(&sc->gre_rc);
+			route_cache_invalidate(&sc->gre_rc);
+			if (sc->gre_family != 0)
+				route_cache_subscribe_rib_event(&sc->gre_rc,
+				    sc->gre_family, sc->gre_fibnum);
+		}
 		break;
 	case GRESKEY:
 	case GRESOPTS:
@@ -399,11 +408,13 @@ gre_delete_tunnel(struct gre_softc *sc)
 	struct gre_socket *gs;
 
 	sx_assert(&gre_ioctl_sx, SA_XLOCKED);
+	route_cache_unsubscribe_rib_event(&sc->gre_rc);
 	if (sc->gre_family != 0) {
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);
 		GRE_WAIT();
 		free(sc->gre_hdr, M_GRE);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 	}
 	/*
@@ -779,12 +790,12 @@ gre_transmit(struct ifnet *ifp, struct mbuf *m)
 	switch (sc->gre_family) {
 #ifdef INET
 	case AF_INET:
-		error = in_gre_output(m, af, sc->gre_hlen);
+		error = in_gre_output(ifp, m, af, sc->gre_hlen);
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		error = in6_gre_output(m, af, sc->gre_hlen, flowid);
+		error = in6_gre_output(ifp, m, af, sc->gre_hlen, flowid);
 		break;
 #endif
 	default:

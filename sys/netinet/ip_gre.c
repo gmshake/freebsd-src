@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/route.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -70,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #endif
 
+#include <net/route/route_cache.h>
 #include <net/if_gre.h>
 #include <machine/in_cksum.h>
 
@@ -426,6 +428,8 @@ in_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	}
 	error = in_gre_attach(sc);
 	if (error != 0) {
+		route_cache_unsubscribe_rib_event(&sc->gre_rc);
+		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
 	}
@@ -476,12 +480,14 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		    M_GRE, M_WAITOK | M_ZERO);
 		ip->ip_src.s_addr = src->sin_addr.s_addr;
 		ip->ip_dst.s_addr = dst->sin_addr.s_addr;
+		route_cache_unsubscribe_rib_event(&sc->gre_rc);
 		if (sc->gre_family != 0) {
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, chain);
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
+			route_cache_invalidate(&sc->gre_rc);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET;
@@ -492,7 +498,9 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		if (error != 0) {
 			sc->gre_family = 0;
 			free(sc->gre_hdr, M_GRE);
-		}
+		} else
+			route_cache_subscribe_rib_event(&sc->gre_rc,
+			    sc->gre_family, sc->gre_fibnum);
 		break;
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:
@@ -515,9 +523,12 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 }
 
 int
-in_gre_output(struct mbuf *m, int af, int hlen)
+in_gre_output(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 {
+	struct gre_softc *sc = ifp->if_softc;
 	struct greip *gi;
+	struct route *ro;
+	int error;
 
 	gi = mtod(m, struct greip *);
 	switch (af) {
@@ -541,7 +552,11 @@ in_gre_output(struct mbuf *m, int af, int hlen)
 	}
 	gi->gi_ip.ip_ttl = V_ip_gre_ttl;
 	gi->gi_ip.ip_len = htons(m->m_pkthdr.len);
-	return (ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL));
+
+	ro = route_cache_acquire(&sc->gre_rc);
+	error = ip_output(m, NULL, ro, IP_FORWARDING, NULL, NULL);
+	route_cache_release(ro);
+	return (error);
 }
 
 static const struct srcaddrtab *ipv4_srcaddrtab = NULL;
