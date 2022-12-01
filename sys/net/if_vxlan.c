@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_clone.h>
 #include <net/if_dl.h>
+#include <net/if_llatbl.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
 #include <net/if_vxlan.h>
@@ -2752,7 +2753,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 	}
 	error = ip6_output(m, NULL, ro, 0, sc->vxl_im6o, NULL, NULL);
 	if (ro != &route)
-		route_cache_release(ro);
+		route_cache_release6(ro);
 	if (error == 0) {
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
 		if_inc_counter(ifp, IFCOUNTER_OBYTES, plen);
