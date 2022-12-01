@@ -32,7 +32,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/sysctl.h>
 
 #include <sys/kernel.h>
 #include <sys/types.h>
@@ -48,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_llatbl.h>
-#include <net/vnet.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/route_ctl.h>
