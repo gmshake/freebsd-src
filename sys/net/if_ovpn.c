@@ -75,6 +75,8 @@
 
 #include <opencrypto/cryptodev.h>
 
+#include <net/route/route_cache.h>
+
 #include "if_ovpn.h"
 
 struct ovpn_kkey_dir {
@@ -141,6 +143,7 @@ struct ovpn_kpeer {
 	struct ovpn_softc	*sc;
 	struct sockaddr_storage	 local;
 	struct sockaddr_storage	 remote;
+	struct route_cache       rc;
 
 	struct in_addr		 vpn4;
 	struct in6_addr		 vpn6;
@@ -502,6 +505,9 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 	callout_stop(&peer->ping_send);
 	callout_stop(&peer->ping_rcv);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
+	route_cache_unsubscribe_rib_event(&peer->rc);
+	route_cache_invalidate(&peer->rc);
+	route_cache_uninit(&peer->rc);
 	free(peer, M_OVPN);
 
 	if (! locked)
@@ -560,6 +566,7 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	peer->refcount = 1;
 	peer->last_active = uma_zalloc_pcpu(pcpu_zone_4, M_WAITOK | M_ZERO);
 	COUNTER_ARRAY_ALLOC(peer->counters, OVPN_PEER_COUNTER_SIZE, M_WAITOK);
+	route_cache_init(&peer->rc);
 
 	if (nvlist_exists_binary(nvl, "vpn_ipv4")) {
 		size_t len;
@@ -672,12 +679,16 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	}
 
 	OVPN_WUNLOCK(sc);
+	// FIXME: does ovpn support tunnel fibnum ?
+	route_cache_subscribe_rib_event(&peer->rc, peer->remote.ss_family,
+	    curthread->td_proc->p_fibnum);
 
 	goto done;
 
 error_locked:
 	OVPN_WUNLOCK(sc);
 error:
+	route_cache_uninit(&peer->rc);
 	free(name, M_SONAME);
 	COUNTER_ARRAY_FREE(peer->counters, OVPN_PEER_COUNTER_SIZE);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
@@ -2001,6 +2012,8 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		struct sockaddr_in *in_local = TO_IN(&peer->local);
 		struct sockaddr_in *in_remote = TO_IN(&peer->remote);
 		struct ip *ip;
+		struct route *ro;
+		int error;
 
 		/*
 		 * This requires knowing the source IP, which we don't. Happily
@@ -2037,7 +2050,11 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		OVPN_RUNLOCK(sc);
 		OVPN_COUNTER_ADD(sc, transport_bytes_sent, m->m_pkthdr.len);
 
-		return (ip_output(m, NULL, NULL, 0, NULL, NULL));
+		// XXX safe under net epoch ?
+		ro = route_cache_acquire(&peer->rc);
+		error = ip_output(m, NULL, ro, 0, NULL, NULL);
+		route_cache_release(ro);
+		return (error);
 	}
 #endif
 #ifdef INET6
@@ -2045,6 +2062,8 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		struct sockaddr_in6 *in6_local = TO_IN6(&peer->local);
 		struct sockaddr_in6 *in6_remote = TO_IN6(&peer->remote);
 		struct ip6_hdr *ip6;
+		struct route_in6 *ro;
+		int error;
 
 		M_PREPEND(m, sizeof(struct ip6_hdr), M_NOWAIT);
 		if (m == NULL) {
@@ -2084,8 +2103,12 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		OVPN_RUNLOCK(sc);
 		OVPN_COUNTER_ADD(sc, transport_bytes_sent, m->m_pkthdr.len);
 
-		return (ip6_output(m, NULL, NULL, IPV6_UNSPECSRC, NULL, NULL,
-		    NULL));
+		// XXX safe under net epoch ?
+		ro = route_cache_acquire6(&peer->rc);
+		error = ip6_output(m, NULL, ro, IPV6_UNSPECSRC, NULL, NULL,
+		    NULL);
+		route_cache_release6(ro);
+		return (error);
 	}
 #endif
 	default:
