@@ -60,12 +60,6 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/uma.h>
 
-
-VNET_DEFINE(u_int, route_cache) = 1;
-SYSCTL_DECL(_net_route);
-SYSCTL_UINT(_net_route, OID_AUTO, cache, CTLFLAG_RW | CTLFLAG_VNET,
-    &VNET_NAME(route_cache), 0, "Enable route cache");
-
 static uma_zone_t route_cache_pcpu_zone;
 
 static void

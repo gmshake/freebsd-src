@@ -33,9 +33,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
-VNET_DECLARE(u_int, route_cache);
-#define V_route_cache VNET(route_cache)
-
 struct route_cache_pcpu;
 
 struct route_cache {
@@ -70,11 +67,9 @@ route_cache_acquire(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 	struct route *ro = NULL;
 
-	if (V_route_cache) {
-		pcpu = zpcpu_get(rc->rc_pcpu);
-		if (mtx_trylock(&pcpu->mtx))
-			ro = &pcpu->ro;
-	}
+	pcpu = zpcpu_get(rc->rc_pcpu);
+	if (mtx_trylock(&pcpu->mtx))
+		ro = &pcpu->ro;
 
 	return ro;
 }
@@ -99,11 +94,9 @@ route_cache_acquire6(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 	struct route_in6 *ro = NULL;
 
-	if (V_route_cache) {
-		pcpu = zpcpu_get(rc->rc_pcpu);
-		if (mtx_trylock(&pcpu->mtx))
-			ro = &pcpu->ro6;
-	}
+	pcpu = zpcpu_get(rc->rc_pcpu);
+	if (mtx_trylock(&pcpu->mtx))
+		ro = &pcpu->ro6;
 
 	return ro;
 }
