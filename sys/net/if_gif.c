@@ -89,6 +89,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_encap.h>
 #include <net/ethernet.h>
 #include <net/if_bridgevar.h>
+#include <net/route/route_cache.h>
 #include <net/if_gif.h>
 
 #include <security/mac/mac_framework.h>
@@ -141,6 +142,7 @@ gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct gif_softc *sc;
 
 	sc = malloc(sizeof(struct gif_softc), M_GIF, M_WAITOK | M_ZERO);
+	route_cache_init(&sc->gif_rc);
 	sc->gif_fibnum = curthread->td_proc->p_fibnum;
 	GIF2IFP(sc) = if_alloc(IFT_GIF);
 	GIF2IFP(sc)->if_softc = sc;
@@ -198,6 +200,7 @@ gif_clone_destroy(struct ifnet *ifp)
 
 	GIF_WAIT();
 	if_free(ifp);
+	route_cache_uninit(&sc->gif_rc);
 	free(sc, M_GIF);
 }
 
@@ -647,8 +650,14 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
-		else
+		else if (ifr->ifr_fib != sc->gif_fibnum) {
 			sc->gif_fibnum = ifr->ifr_fib;
+			route_cache_unsubscribe_rib_event(&sc->gif_rc);
+			route_cache_invalidate(&sc->gif_rc);
+			if (sc->gif_family != 0)
+				route_cache_subscribe_rib_event(&sc->gif_rc,
+				    sc->gif_family, sc->gif_fibnum);
+		}
 		break;
 	case GIFGOPTS:
 		options = sc->gif_options;
@@ -710,14 +719,16 @@ gif_delete_tunnel(struct gif_softc *sc)
 {
 
 	sx_assert(&gif_ioctl_sx, SA_XLOCKED);
+	route_cache_unsubscribe_rib_event(&sc->gif_rc);
 	if (sc->gif_family != 0) {
 		CK_LIST_REMOVE(sc, srchash);
 		CK_LIST_REMOVE(sc, chain);
 		/* Wait until it become safe to free gif_hdr */
 		GIF_WAIT();
 		free(sc->gif_hdr, M_GIF);
+		route_cache_invalidate(&sc->gif_rc);
+		sc->gif_family = 0;
 	}
-	sc->gif_family = 0;
 	GIF2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 	if_link_state_change(GIF2IFP(sc), LINK_STATE_DOWN);
 }

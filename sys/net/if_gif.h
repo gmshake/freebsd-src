@@ -40,6 +40,7 @@
 
 struct ip;
 struct ip6_hdr;
+struct route_cache;
 
 extern	void (*ng_gif_input_p)(struct ifnet *ifp, struct mbuf **mp,
 		int af);
@@ -61,6 +62,7 @@ struct gif_softc {
 		struct ip	*iphdr;
 		struct ip6_hdr	*ip6hdr;
 	} gif_uhdr;
+	struct route_cache	gif_rc;
 
 	CK_LIST_ENTRY(gif_softc) chain;
 	CK_LIST_ENTRY(gif_softc) srchash;
