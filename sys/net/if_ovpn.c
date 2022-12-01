@@ -448,7 +448,7 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 	callout_stop(&peer->ping_send);
 	callout_stop(&peer->ping_rcv);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
-	route_cache_unsubscribe_rib_event(&peer->rc)
+	route_cache_unsubscribe_rib_event(&peer->rc);
 	route_cache_invalidate(&peer->rc);
 	route_cache_uninit(&peer->rc);
 	free(peer, M_OVPN);
