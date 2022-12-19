@@ -58,112 +58,86 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/uma.h>
 
-static uma_zone_t route_cache_pcpu_zone;
-
-static void
-route_cache_pcpu_zone_init(void)
-{
-	route_cache_pcpu_zone = uma_zcreate("route-cache-pcpu",
-	    sizeof(struct route_cache_pcpu), NULL, NULL, NULL, NULL,
-	    UMA_ALIGN_PTR, UMA_ZONE_PCPU);
-}
-
-SYSINIT(route_cache_pcpu_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
-    route_cache_pcpu_zone_init, NULL);
-
-static void
-route_cache_pcpu_zone_uninit(void)
-{
-	uma_zdestroy(route_cache_pcpu_zone);
-}
-
-SYSUNINIT(route_cache_pcpu_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
-    route_cache_pcpu_zone_uninit, NULL);
 
 void
-route_cache_init(struct route_cache *rc)
+route_cache_init(struct route_cache *rc, int family)
 {
-	int cpu;
-	struct route_cache_pcpu *pcpu;
-	struct route_cache_pcpu *rc_pcpu = uma_zalloc_pcpu(route_cache_pcpu_zone,
-	    M_WAITOK | M_ZERO);
-	CPU_FOREACH(cpu) {
-		pcpu = zpcpu_get_cpu(rc_pcpu, cpu);
+	switch (family) {
 #ifdef INET
-		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
-#else
+	case AF_INET:
+		route_cache_init_in(rc);
+		break;
+#endif
 #ifdef INET6
-		pcpu->ro6.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
+	case AF_INET6:
+		route_cache_init_in6(rc);
+		break;
 #endif
-#endif
-		mtx_init(&pcpu->mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
-	}
-	rc->rc_pcpu = rc_pcpu;
-	rc->rs = NULL;
-}
-
-void
-route_cache_uninit(struct route_cache *rc)
-{
-	int cpu;
-	struct route_cache_pcpu *pcpu;
-	CPU_FOREACH(cpu) {
-		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
-		mtx_assert(&pcpu->mtx, MA_NOTOWNED);
-#ifdef INVARIANTS
-		mtx_lock(&pcpu->mtx);
-#ifdef INET
-		KASSERT((pcpu->ro.ro_nh == NULL), ("route nexthop cache is not freed"));
-		KASSERT((pcpu->ro.ro_lle == NULL), ("route llentry is not freed"));
-#else
-#ifdef INET6
-		KASSERT((pcpu->ro6.ro_nh == NULL), ("route nexthop cache is not freed"));
-		KASSERT((pcpu->ro6.ro_lle == NULL), ("route llentry is not freed"));
-#endif
-#endif
-		mtx_unlock(&pcpu->mtx);
-#endif
-		mtx_destroy(&pcpu->mtx);
-	}
-	uma_zfree_pcpu(route_cache_pcpu_zone, rc->rc_pcpu);
-	rc->rc_pcpu = NULL; /* XXX 0xdeadc0de ? */
-}
-
-// XXX invalid cache via smp_rendezvous() ?
-void
-route_cache_invalidate(struct route_cache *rc)
-{
-	int cpu;
-	struct route_cache_pcpu *pcpu;
-	CPU_FOREACH(cpu) {
-		pcpu = zpcpu_get_cpu(rc->rc_pcpu, cpu);
-		mtx_lock(&pcpu->mtx);
-#ifdef INET
-		RO_INVALIDATE_CACHE(&pcpu->ro);
-#else
-#ifdef INET6
-		RO_INVALIDATE_CACHE(&pcpu->ro6);
-#endif
-#endif
-		mtx_unlock(&pcpu->mtx);
+	default:
+		// Unreachable
+		panic("Unsupported af: %d", family);
 	}
 }
 
-static void
-route_cache_subscription_cb(struct rib_head *rnh __unused,
-    struct rib_cmd_info *rci __unused, void *arg)
+void
+route_cache_uninit(struct route_cache *rc, int family)
 {
-	struct route_cache *rc = arg;
-	route_cache_invalidate(rc);
+	switch (family) {
+#ifdef INET
+	case AF_INET:
+		route_cache_uninit_in(rc);
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		route_cache_uninit_in6(rc);
+		break;
+#endif
+	default:
+		// Unreachable
+		panic("Unsupported af: %d", family);
+	}
+}
+
+void
+route_cache_invalidate(struct route_cache *rc, int family)
+{
+	switch (family) {
+#ifdef INET
+	case AF_INET:
+		route_cache_invalidate_in(rc);
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		route_cache_invalidate_in6(rc);
+		break;
+#endif
+	default:
+		// Unreachable
+		panic("Unsupported af: %d", family);
+	}
 }
 
 void
 route_cache_subscribe_rib_event(struct route_cache *rc, int family,
     uint32_t fibnum)
 {
-	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
-	rc->rs = rib_subscribe(fibnum, family, route_cache_subscription_cb,
-	    rc, RIB_NOTIFY_IMMEDIATE, true);
+	switch (family) {
+#ifdef INET
+	case AF_INET:
+		route_cache_subscribe_rib_event_in(rc, fibnum);
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		route_cache_subscribe_rib_event_in6(rc, fibnum);
+		break;
+#endif
+	default:
+		// Unreachable
+		panic("Unsupported af: %d", family);
+	}
 }
 
 void
@@ -171,10 +145,9 @@ route_cache_unsubscribe_rib_event(struct route_cache *rc)
 {
 	struct epoch_tracker et;
 
-	if (rc->rs != NULL) {
-		NET_EPOCH_ENTER(et);
-		rib_unsubscribe(rc->rs);
-		NET_EPOCH_EXIT(et);
-		rc->rs = NULL;
-	}
+	KASSERT((rc->rs != NULL), ("not subscribed rib event"));
+	NET_EPOCH_ENTER(et);
+	rib_unsubscribe(rc->rs);
+	NET_EPOCH_EXIT(et);
+	rc->rs = NULL;
 }

@@ -4185,6 +4185,8 @@ net/route/nhop_ctl.c		standard
 net/route/nhop_utils.c		standard
 net/route/fib_algo.c		optional fib_algo
 net/route/route_cache.c		optional inet | inet6
+net/route/route_cache_in.c	optional inet
+net/route/route_cache_in6.c	optional inet6
 net/route/route_ctl.c		standard
 net/route/route_ddb.c		optional ddb
 net/route/route_helpers.c	standard
