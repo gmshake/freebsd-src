@@ -236,19 +236,20 @@ in_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip = malloc(sizeof(*ip), M_GIF, M_WAITOK | M_ZERO);
 		ip->ip_src.s_addr = src->sin_addr.s_addr;
 		ip->ip_dst.s_addr = dst->sin_addr.s_addr;
-		route_cache_unsubscribe_rib_event(&sc->gif_rc);
 		if (sc->gif_family != 0) {
+			route_cache_unsubscribe_rib_event(&sc->gif_rc);
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
-			route_cache_invalidate(&sc->gif_rc);
+			route_cache_uninit(&sc->gif_rc, sc->gif_family);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET;
 		sc->gif_iphdr = ip;
 		in_gif_attach(sc);
+		route_cache_init(&sc->gif_rc, sc->gif_family);
 		NET_EPOCH_ENTER(et);
 		in_gif_set_running(sc);
 		NET_EPOCH_EXIT(et);

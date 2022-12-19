@@ -251,19 +251,20 @@ in6_gif_ioctl(struct gif_softc *sc, u_long cmd, caddr_t data)
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
 		ip6->ip6_vfc = IPV6_VERSION;
-		route_cache_unsubscribe_rib_event(&sc->gif_rc);
 		if (sc->gif_family != 0) {
+			route_cache_unsubscribe_rib_event(&sc->gif_rc);
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, srchash);
 			CK_LIST_REMOVE(sc, chain);
 			GIF_WAIT();
 			free(sc->gif_hdr, M_GIF);
-			route_cache_invalidate(&sc->gif_rc);
+			route_cache_uninit(&sc->gif_rc, sc->gif_family);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gif_family = AF_INET6;
 		sc->gif_ip6hdr = ip6;
 		in6_gif_attach(sc);
+		route_cache_init(&sc->gif_rc, sc->gif_family);
 		in6_gif_set_running(sc);
 		route_cache_subscribe_rib_event(&sc->gif_rc, sc->gif_family,
 		    sc->gif_fibnum);
