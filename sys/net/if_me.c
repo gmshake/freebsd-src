@@ -195,7 +195,6 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	struct me_softc *sc;
 
 	sc = malloc(sizeof(struct me_softc), M_IFME, M_WAITOK | M_ZERO);
-	route_cache_init(&sc->me_rc);
 	sc->me_fibnum = curthread->td_proc->p_fibnum;
 	ME2IFP(sc) = if_alloc(IFT_TUNNEL);
 	ME2IFP(sc)->if_softc = sc;
@@ -212,6 +211,7 @@ me_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 #endif
 	ME2IFP(sc)->if_capabilities |= IFCAP_LINKSTATE;
 	ME2IFP(sc)->if_capenable |= IFCAP_LINKSTATE;
+	bzero(&sc->me_rc, sizeof(sc->me_rc));
 	if_attach(ME2IFP(sc));
 	bpfattach(ME2IFP(sc), DLT_NULL, sizeof(u_int32_t));
 	return (0);
@@ -247,7 +247,6 @@ me_clone_destroy(struct ifnet *ifp)
 
 	ME_WAIT();
 	if_free(ifp);
-	route_cache_uninit(&sc->me_rc);
 	free(sc, M_IFME);
 }
 
@@ -333,11 +332,12 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = EINVAL;
 		else if (ifr->ifr_fib != sc->me_fibnum) {
 			sc->me_fibnum = ifr->ifr_fib;
-			route_cache_unsubscribe_rib_event(&sc->me_rc);
-			route_cache_invalidate(&sc->me_rc);
-			if (ME_READY(sc))
-				route_cache_subscribe_rib_event(&sc->me_rc,
-				    AF_INET, sc->me_fibnum);
+			if (ME_READY(sc)) {
+				route_cache_unsubscribe_rib_event(&sc->me_rc);
+				route_cache_invalidate_in(&sc->me_rc);
+				route_cache_subscribe_rib_event_in(&sc->me_rc,
+				    sc->me_fibnum);
+			}
 		}
 		break;
 	default:
@@ -440,11 +440,12 @@ me_set_tunnel(struct me_softc *sc, in_addr_t src, in_addr_t dst)
 	sc->me_src.s_addr = src;
 	CK_LIST_INSERT_HEAD(&ME_HASH(src, dst), sc, chain);
 	CK_LIST_INSERT_HEAD(&ME_SRCHASH(src), sc, srchash);
+	route_cache_init_in(&sc->me_rc);
 
 	NET_EPOCH_ENTER(et);
 	me_set_running(sc);
 	NET_EPOCH_EXIT(et);
-	route_cache_subscribe_rib_event(&sc->me_rc, AF_INET, sc->me_fibnum);
+	route_cache_subscribe_rib_event_in(&sc->me_rc, sc->me_fibnum);
 	if_link_state_change(ME2IFP(sc), LINK_STATE_UP);
 	return (0);
 }
@@ -454,17 +455,21 @@ me_delete_tunnel(struct me_softc *sc)
 {
 
 	sx_assert(&me_ioctl_sx, SA_XLOCKED);
-	route_cache_unsubscribe_rib_event(&sc->me_rc);
 	if (ME_READY(sc)) {
+#ifdef VIMAGE
+		// On vnet destroy, it is too late to unsubscribe_rib_event
+		if (!curvnet->vnet_shutdown)
+#endif
+		route_cache_unsubscribe_rib_event(&sc->me_rc);
 		CK_LIST_REMOVE(sc, chain);
 		CK_LIST_REMOVE(sc, srchash);
 		ME_WAIT();
 
 		sc->me_src.s_addr = 0;
 		sc->me_dst.s_addr = 0;
-		route_cache_invalidate(&sc->me_rc);
 		ME2IFP(sc)->if_drv_flags &= ~IFF_DRV_RUNNING;
 		if_link_state_change(ME2IFP(sc), LINK_STATE_DOWN);
+		route_cache_uninit_in(&sc->me_rc);
 	}
 }
 
