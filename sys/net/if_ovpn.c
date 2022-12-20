@@ -506,7 +506,6 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 	callout_stop(&peer->ping_send);
 	callout_stop(&peer->ping_rcv);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
-
 	route_cache_uninit(&peer->rc, peer->remote.ss_family);
 	free(peer, M_OVPN);
 
@@ -2049,7 +2048,6 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		OVPN_RUNLOCK(sc);
 		OVPN_COUNTER_ADD(sc, transport_bytes_sent, m->m_pkthdr.len);
 
-		// XXX safe under net epoch ?
 		ro = route_cache_acquire(&peer->rc);
 		error = ip_output(m, NULL, ro, 0, NULL, NULL);
 		route_cache_release(ro);
@@ -2102,7 +2100,6 @@ ovpn_encap(struct ovpn_softc *sc, uint32_t peerid, struct mbuf *m)
 		OVPN_RUNLOCK(sc);
 		OVPN_COUNTER_ADD(sc, transport_bytes_sent, m->m_pkthdr.len);
 
-		// XXX safe under net epoch ?
 		ro = route_cache_acquire6(&peer->rc);
 		error = ip6_output(m, NULL, ro, IPV6_UNSPECSRC, NULL, NULL,
 		    NULL);
