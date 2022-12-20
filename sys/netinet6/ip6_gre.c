@@ -386,8 +386,10 @@ in6_gre_attach(struct gre_softc *sc)
 		CK_LIST_INSERT_HEAD(&GRE_HASH_SC(sc), sc, chain);
 	CK_LIST_INSERT_HEAD(&GRE_SRCHASH(&sc->gre_oip6.ip6_src), sc, srchash);
 
+	route_cache_init_in6(&sc->gre_rc);
 	/* Set IFF_DRV_RUNNING if interface is ready */
 	in6_gre_set_running(sc);
+	route_cache_subscribe_rib_event_in6(&sc->gre_rc, sc->gre_fibnum);
 	return (0);
 }
 
@@ -427,8 +429,6 @@ in6_gre_setopts(struct gre_softc *sc, u_long cmd, uint32_t value)
 	}
 	error = in6_gre_attach(sc);
 	if (error != 0) {
-		route_cache_unsubscribe_rib_event(&sc->gre_rc);
-		route_cache_invalidate(&sc->gre_rc);
 		sc->gre_family = 0;
 		free(sc->gre_hdr, M_GRE);
 	}
@@ -488,14 +488,14 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		    M_GRE, M_WAITOK | M_ZERO);
 		ip6->ip6_src = src->sin6_addr;
 		ip6->ip6_dst = dst->sin6_addr;
-		route_cache_unsubscribe_rib_event(&sc->gre_rc);
 		if (sc->gre_family != 0) {
+			route_cache_unsubscribe_rib_event(&sc->gre_rc);
 			/* Detach existing tunnel first */
 			CK_LIST_REMOVE(sc, chain);
 			CK_LIST_REMOVE(sc, srchash);
 			GRE_WAIT();
 			free(sc->gre_hdr, M_GRE);
-			route_cache_invalidate(&sc->gre_rc);
+			route_cache_uninit(&sc->gre_rc, sc->gre_family);
 			/* XXX: should we notify about link state change? */
 		}
 		sc->gre_family = AF_INET6;
@@ -506,9 +506,7 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 		if (error != 0) {
 			sc->gre_family = 0;
 			free(sc->gre_hdr, M_GRE);
-		} else
-			route_cache_subscribe_rib_event(&sc->gre_rc,
-			    sc->gre_family, sc->gre_fibnum);
+		}
 		break;
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
