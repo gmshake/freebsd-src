@@ -493,6 +493,7 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 	/* The peer should have been removed from the list already. */
 	MPASS(ovpn_find_peer(sc, peer->peerid) == NULL);
 
+	route_cache_unsubscribe_rib_event(&peer->rc);
 	ovpn_notify_del_peer(sc, peer);
 
 	for (int i = 0; i < 2; i++) {
@@ -505,9 +506,8 @@ ovpn_peer_release_ref(struct ovpn_kpeer *peer, bool locked)
 	callout_stop(&peer->ping_send);
 	callout_stop(&peer->ping_rcv);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
-	route_cache_unsubscribe_rib_event(&peer->rc);
-	route_cache_invalidate(&peer->rc);
-	route_cache_uninit(&peer->rc);
+
+	route_cache_uninit(&peer->rc, peer->remote.ss_family);
 	free(peer, M_OVPN);
 
 	if (! locked)
@@ -566,7 +566,6 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	peer->refcount = 1;
 	peer->last_active = uma_zalloc_pcpu(pcpu_zone_4, M_WAITOK | M_ZERO);
 	COUNTER_ARRAY_ALLOC(peer->counters, OVPN_PEER_COUNTER_SIZE, M_WAITOK);
-	route_cache_init(&peer->rc);
 
 	if (nvlist_exists_binary(nvl, "vpn_ipv4")) {
 		size_t len;
@@ -678,8 +677,9 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 		goto error_locked;
 	}
 
+	route_cache_init(&peer->rc, peer->remote.ss_family);
 	OVPN_WUNLOCK(sc);
-	// FIXME: does ovpn support tunnel fibnum ?
+	// FIXME: will proc fibnum change ?
 	route_cache_subscribe_rib_event(&peer->rc, peer->remote.ss_family,
 	    curthread->td_proc->p_fibnum);
 
@@ -688,7 +688,6 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 error_locked:
 	OVPN_WUNLOCK(sc);
 error:
-	route_cache_uninit(&peer->rc);
 	free(name, M_SONAME);
 	COUNTER_ARRAY_FREE(peer->counters, OVPN_PEER_COUNTER_SIZE);
 	uma_zfree_pcpu(pcpu_zone_4, peer->last_active);
