@@ -52,33 +52,52 @@ __FBSDID("$FreeBSD$");
 #include <net/route/route_ctl.h>
 
 #include <netinet/in.h>
+#include <netinet/in_fib.h>
 #include <netinet6/in6_var.h>
 
-#define RC_INTERNAL 1
 #include <net/route/route_cache.h>
 
 #include <vm/uma.h>
 
 
+static uma_zone_t route_cache_pcpu_zone;
+
+static void
+route_cache_pcpu_zone_init(void)
+{
+	route_cache_pcpu_zone = uma_zcreate("route-cache-pcpu",
+	    sizeof(struct route_cache_pcpu), NULL, NULL, NULL, NULL,
+	    UMA_ALIGN_PTR, UMA_ZONE_PCPU);
+}
+
+SYSINIT(route_cache_pcpu_zone_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
+    route_cache_pcpu_zone_init, NULL);
+
+static void
+route_cache_pcpu_zone_uninit(void)
+{
+	uma_zdestroy(route_cache_pcpu_zone);
+}
+
+SYSUNINIT(route_cache_pcpu_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
+    route_cache_pcpu_zone_uninit, NULL);
+
 void
 route_cache_init(struct route_cache *rc, int family, uint32_t fibnum)
 {
+	int cpu;
+	struct route_cache_pcpu *pcpu, *rc_pcpu;
+
 	KASSERT((family != 0), ("family required"));
-	switch (family) {
-#ifdef INET
-	case AF_INET:
-		route_cache_init_in(rc);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		route_cache_init_in6(rc);
-		break;
-#endif
-	default:
-		// Unreachable
-		panic("Unsupported af: %d", family);
+	KASSERT((rc->pcpu == NULL), ("route cache has been inited"));
+	KASSERT((rc->rs == NULL), ("route cache has subscribed rib event"));
+	rc_pcpu = uma_zalloc_pcpu(route_cache_pcpu_zone, M_WAITOK | M_ZERO);
+	CPU_FOREACH(cpu) {
+		pcpu = zpcpu_get_cpu(rc_pcpu, cpu);
+		mtx_init(&pcpu->mtx, "route_cache_pcpu_mtx", NULL, MTX_DEF);
+		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 	}
+	rc->pcpu = rc_pcpu;
 	rc->family = family;
 	rc->fibnum = fibnum;
 }
@@ -86,43 +105,56 @@ route_cache_init(struct route_cache *rc, int family, uint32_t fibnum)
 void
 route_cache_uninit(struct route_cache *rc)
 {
+	int cpu;
+	struct route_cache_pcpu *pcpu;
+
+	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
 	KASSERT((rc->family != 0), ("family required"));
-	switch (rc->family) {
-#ifdef INET
-	case AF_INET:
-		route_cache_uninit_in(rc);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		route_cache_uninit_in6(rc);
-		break;
-#endif
-	default:
-		// Unreachable
-		panic("Unsupported af: %d", rc->family);
+	KASSERT((rc->rs == NULL), ("should unsubscribe rib event before uninit"));
+	CPU_FOREACH(cpu) {
+		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
+		mtx_assert(&pcpu->mtx, MA_NOTOWNED);
+		// XXX use atomic_thread_fence_acq ?
+		mtx_lock(&pcpu->mtx);
+		RO_INVALIDATE_CACHE(&pcpu->ro);
+		mtx_unlock(&pcpu->mtx);
+		mtx_destroy(&pcpu->mtx);
 	}
+	uma_zfree_pcpu(route_cache_pcpu_zone, rc->pcpu);
+	rc->pcpu = NULL;
 	rc->family = 0;
 }
 
 void
 route_cache_invalidate(struct route_cache *rc)
 {
+	int cpu;
+	struct route_cache_pcpu *pcpu;
+
+	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
 	KASSERT((rc->family != 0), ("family required"));
-	switch (rc->family) {
-#ifdef INET
-	case AF_INET:
-		route_cache_invalidate_in(rc);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		route_cache_invalidate_in6(rc);
-		break;
-#endif
-	default:
-		// Unreachable
-		panic("Unsupported af: %d", rc->family);
+	CPU_FOREACH(cpu) {
+		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
+		mtx_lock(&pcpu->mtx);
+		RO_INVALIDATE_CACHE(&pcpu->ro);
+		mtx_unlock(&pcpu->mtx);
+	}
+}
+
+static void
+route_cache_revalidate(struct route_cache *rc)
+{
+	int cpu;
+	struct route_cache_pcpu *pcpu;
+
+	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
+	KASSERT((rc->family != 0), ("family required"));
+	CPU_FOREACH(cpu) {
+		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
+		if (mtx_trylock(&pcpu->mtx) && pcpu->ro.ro_nh != NULL) {
+			NH_VALIDATE(&pcpu->ro, &pcpu->ro.ro_cookie, rc->fibnum);
+			mtx_unlock(&pcpu->mtx);
+		}
 	}
 }
 
@@ -132,22 +164,7 @@ route_cache_subscription_cb(struct rib_head *rnh __unused,
 {
 	struct route_cache *rc = arg;
 
-	KASSERT((rc->family != 0), ("family required"));
-	switch (rc->family) {
-#ifdef INET
-	case AF_INET:
-		route_cache_revalidate_in(rc);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		route_cache_revalidate_in6(rc);
-		break;
-#endif
-	default:
-		// Unreachable
-		panic("Unsupported af: %d", rc->family);
-	}
+	route_cache_revalidate(rc);
 }
 
 void

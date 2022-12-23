@@ -30,29 +30,21 @@
 #ifndef _NET_ROUTE_ROUTE_CACHE_H_
 #define _NET_ROUTE_ROUTE_CACHE_H_
 
-#ifdef INET
 struct route_cache_pcpu {
 	struct mtx mtx;
-	struct route ro;
-} __aligned(CACHE_LINE_SIZE);
-#endif
-
-#ifdef INET6
-struct route_cache_pcpu6 {
-	struct mtx mtx;
-	struct route_in6 ro6;
-} __aligned(CACHE_LINE_SIZE);
-#endif
-
-struct route_cache {
 	union {
+		struct route ro;
 #ifdef INET
-		struct route_cache_pcpu *pcpu;
+		struct route_in ro4;
 #endif
 #ifdef INET6
-		struct route_cache_pcpu6 *pcpu6;
+		struct route_in6 ro6;
 #endif
 	};
+} __aligned(CACHE_LINE_SIZE);
+
+struct route_cache {
+	struct route_cache_pcpu *pcpu;
 	struct rib_subscription *rs;
 	int family;
 	uint32_t fibnum;
@@ -63,14 +55,6 @@ void route_cache_uninit(struct route_cache *);
 void route_cache_invalidate(struct route_cache *);
 void route_cache_subscribe_rib_event(struct route_cache *);
 void route_cache_unsubscribe_rib_event(struct route_cache *);
-
-#ifdef INET
-#if RC_INTERNAL
-void route_cache_init_in(struct route_cache *);
-void route_cache_uninit_in(struct route_cache *);
-void route_cache_invalidate_in(struct route_cache *);
-void route_cache_revalidate_in(struct route_cache *rc);
-#endif
 
 static inline struct route *
 route_cache_acquire(struct route_cache *rc)
@@ -96,23 +80,15 @@ route_cache_release(struct route *ro)
 		mtx_unlock(&pcpu->mtx);
 	}
 }
-#endif
 
 #ifdef INET6
-#if RC_INTERNAL
-void route_cache_init_in6(struct route_cache *);
-void route_cache_uninit_in6(struct route_cache *);
-void route_cache_invalidate_in6(struct route_cache *);
-void route_cache_revalidate_in(struct route_cache *rc);
-#endif
-
 static inline struct route_in6 *
 route_cache_acquire6(struct route_cache *rc)
 {
-	struct route_cache_pcpu6 *pcpu;
+	struct route_cache_pcpu *pcpu;
 	struct route_in6 *ro = NULL;
 
-	pcpu = zpcpu_get(rc->pcpu6);
+	pcpu = zpcpu_get(rc->pcpu);
 	if (mtx_trylock(&pcpu->mtx))
 		ro = &pcpu->ro6;
 
@@ -122,10 +98,10 @@ route_cache_acquire6(struct route_cache *rc)
 static inline void
 route_cache_release6(struct route_in6 *ro)
 {
-	struct route_cache_pcpu6 *pcpu;
+	struct route_cache_pcpu *pcpu;
 
 	if (ro != NULL) {
-		pcpu = __containerof(ro, struct route_cache_pcpu6, ro6);
+		pcpu = __containerof(ro, struct route_cache_pcpu, ro6);
 		mtx_assert(&pcpu->mtx, MA_OWNED);
 		mtx_unlock(&pcpu->mtx);
 	}
