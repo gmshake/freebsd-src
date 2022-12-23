@@ -142,29 +142,12 @@ route_cache_invalidate(struct route_cache *rc)
 }
 
 static void
-route_cache_revalidate(struct route_cache *rc)
-{
-	int cpu;
-	struct route_cache_pcpu *pcpu;
-
-	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
-	KASSERT((rc->family != 0), ("family required"));
-	CPU_FOREACH(cpu) {
-		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
-		if (mtx_trylock(&pcpu->mtx) && pcpu->ro.ro_nh != NULL) {
-			NH_VALIDATE(&pcpu->ro, &pcpu->ro.ro_cookie, rc->fibnum);
-			mtx_unlock(&pcpu->mtx);
-		}
-	}
-}
-
-static void
 route_cache_subscription_cb(struct rib_head *rnh __unused,
     struct rib_cmd_info *rci __unused, void *arg)
 {
 	struct route_cache *rc = arg;
 
-	route_cache_revalidate(rc);
+	route_cache_invalidate(rc);
 }
 
 void

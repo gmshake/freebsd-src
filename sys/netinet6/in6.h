@@ -380,7 +380,6 @@ struct route_in6 {
 	uint16_t	ro_flags;
 	uint16_t	ro_mtu;	/* saved ro_rt mtu */
 	uint16_t	spare;
-	volatile u_int	ro_cookie;
 	struct	sockaddr_in6 ro_dst;
 };
 #endif
