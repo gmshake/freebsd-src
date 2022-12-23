@@ -54,14 +54,16 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 
+#define RC_INTERNAL 1
 #include <net/route/route_cache.h>
 
 #include <vm/uma.h>
 
 
 void
-route_cache_init(struct route_cache *rc, int family)
+route_cache_init(struct route_cache *rc, int family, uint32_t fibnum)
 {
+	KASSERT((family != 0), ("family required"));
 	switch (family) {
 #ifdef INET
 	case AF_INET:
@@ -77,12 +79,15 @@ route_cache_init(struct route_cache *rc, int family)
 		// Unreachable
 		panic("Unsupported af: %d", family);
 	}
+	rc->family = family;
+	rc->fibnum = fibnum;
 }
 
 void
-route_cache_uninit(struct route_cache *rc, int family)
+route_cache_uninit(struct route_cache *rc)
 {
-	switch (family) {
+	KASSERT((rc->family != 0), ("family required"));
+	switch (rc->family) {
 #ifdef INET
 	case AF_INET:
 		route_cache_uninit_in(rc);
@@ -95,14 +100,16 @@ route_cache_uninit(struct route_cache *rc, int family)
 #endif
 	default:
 		// Unreachable
-		panic("Unsupported af: %d", family);
+		panic("Unsupported af: %d", rc->family);
 	}
+	rc->family = 0;
 }
 
 void
-route_cache_invalidate(struct route_cache *rc, int family)
+route_cache_invalidate(struct route_cache *rc)
 {
-	switch (family) {
+	KASSERT((rc->family != 0), ("family required"));
+	switch (rc->family) {
 #ifdef INET
 	case AF_INET:
 		route_cache_invalidate_in(rc);
@@ -115,29 +122,41 @@ route_cache_invalidate(struct route_cache *rc, int family)
 #endif
 	default:
 		// Unreachable
-		panic("Unsupported af: %d", family);
+		panic("Unsupported af: %d", rc->family);
 	}
 }
 
-void
-route_cache_subscribe_rib_event(struct route_cache *rc, int family,
-    uint32_t fibnum)
+static void
+route_cache_subscription_cb(struct rib_head *rnh __unused,
+    struct rib_cmd_info *rci __unused, void *arg)
 {
-	switch (family) {
+	struct route_cache *rc = arg;
+
+	KASSERT((rc->family != 0), ("family required"));
+	switch (rc->family) {
 #ifdef INET
 	case AF_INET:
-		route_cache_subscribe_rib_event_in(rc, fibnum);
+		route_cache_revalidate_in(rc);
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		route_cache_subscribe_rib_event_in6(rc, fibnum);
+		route_cache_revalidate_in6(rc);
 		break;
 #endif
 	default:
 		// Unreachable
-		panic("Unsupported af: %d", family);
+		panic("Unsupported af: %d", rc->family);
 	}
+}
+
+void
+route_cache_subscribe_rib_event(struct route_cache *rc)
+{
+	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
+	KASSERT((rc->family != 0), ("family required"));
+	rc->rs = rib_subscribe(rc->fibnum, rc->family, route_cache_subscription_cb,
+	    rc, RIB_NOTIFY_IMMEDIATE, true);
 }
 
 void

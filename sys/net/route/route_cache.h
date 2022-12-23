@@ -54,19 +54,23 @@ struct route_cache {
 #endif
 	};
 	struct rib_subscription *rs;
+	int family;
+	uint32_t fibnum;
 };
 
-void route_cache_init(struct route_cache *, int);
-void route_cache_uninit(struct route_cache *, int);
-void route_cache_invalidate(struct route_cache *, int);
-void route_cache_subscribe_rib_event(struct route_cache *, int, uint32_t);
+void route_cache_init(struct route_cache *, int, uint32_t);
+void route_cache_uninit(struct route_cache *);
+void route_cache_invalidate(struct route_cache *);
+void route_cache_subscribe_rib_event(struct route_cache *);
 void route_cache_unsubscribe_rib_event(struct route_cache *);
 
 #ifdef INET
+#if RC_INTERNAL
 void route_cache_init_in(struct route_cache *);
 void route_cache_uninit_in(struct route_cache *);
 void route_cache_invalidate_in(struct route_cache *);
-void route_cache_subscribe_rib_event_in(struct route_cache *, uint32_t);
+void route_cache_revalidate_in(struct route_cache *rc);
+#endif
 
 static inline struct route *
 route_cache_acquire(struct route_cache *rc)
@@ -95,10 +99,12 @@ route_cache_release(struct route *ro)
 #endif
 
 #ifdef INET6
+#if RC_INTERNAL
 void route_cache_init_in6(struct route_cache *);
 void route_cache_uninit_in6(struct route_cache *);
 void route_cache_invalidate_in6(struct route_cache *);
-void route_cache_subscribe_rib_event_in6(struct route_cache *, uint32_t);
+void route_cache_revalidate_in(struct route_cache *rc);
+#endif
 
 static inline struct route_in6 *
 route_cache_acquire6(struct route_cache *rc)

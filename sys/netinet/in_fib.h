@@ -41,6 +41,7 @@ struct route_in {
 	uint16_t	ro_flags;
 	uint16_t	ro_mtu;	/* saved ro_rt mtu */
 	uint16_t	spare;
+	volatile u_int	ro_cookie;
 	/* custom sockaddr */
 	struct sockaddr_in ro_dst4;
 };

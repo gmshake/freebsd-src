@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 
+#define RC_INTERNAL 1
 #include <net/route/route_cache.h>
 
 #include <vm/uma.h>
@@ -132,19 +133,17 @@ route_cache_invalidate_in6(struct route_cache *rc)
 	}
 }
 
-static void
-route_cache_subscription_cb_in6(struct rib_head *rnh __unused,
-    struct rib_cmd_info *rci __unused, void *arg)
-{
-	struct route_cache *rc = arg;
-	// XXX revalidate should be enough, NH_VALIDATE
-	route_cache_invalidate_in6(rc);
-}
-
 void
-route_cache_subscribe_rib_event_in6(struct route_cache *rc, uint32_t fibnum)
+route_cache_revalidate_in6(struct route_cache *rc)
 {
-	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
-	rc->rs = rib_subscribe(fibnum, AF_INET6, route_cache_subscription_cb_in6,
-	    rc, RIB_NOTIFY_IMMEDIATE, true);
+	int cpu;
+	struct route_cache_pcpu6 *pcpu;
+
+	CPU_FOREACH(cpu) {
+		pcpu = zpcpu_get_cpu(rc->pcpu6, cpu);
+		if (mtx_trylock(&pcpu->mtx) && pcpu->ro6.ro_nh != NULL) {
+			NH_VALIDATE(&pcpu->ro6, &pcpu->ro6.ro_cookie, rc->fibnum);
+			mtx_unlock(&pcpu->mtx);
+		}
+	}
 }
