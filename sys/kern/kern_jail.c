@@ -843,7 +843,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 				i++;
 				break;
 			case 0:
-				bcopy(PR_IP(pr, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
 				i++;
 				pi++;
 				ips++;
@@ -4915,9 +4915,7 @@ db_show_prison(struct prison *pr)
 		for (ii = 0; ii < pr->pr_addrs[af]->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip4.addr        =" : "                 ",
-			    inet_ntoa_r(
-			    *(const struct in_addr *)PR_IP(pr->pr_addrs[af], ii),
-			    ip4buf));
+			    inet_ntoa_r(pr->pr_addrs[af]->pr_ip4[ii], ip4buf));
 	}
 #endif
 #ifdef INET6
@@ -4928,8 +4926,7 @@ db_show_prison(struct prison *pr)
 		for (ii = 0; ii < pr->pr_addrs[af]->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip6.addr        =" : "                 ",
-			    ip6_sprintf(ip6buf,
-			    (const struct in6_addr *)PR_IP(pr->pr_addrs[af], ii)));
+			    ip6_sprintf(ip6buf, pr->pr_addrs[af]->pr_ip6[ii]));
 	}
 #endif
 }
