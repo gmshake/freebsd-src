@@ -46,14 +46,12 @@ struct route_cache_pcpu {
 struct route_cache {
 	struct route_cache_pcpu *pcpu;
 	struct rib_subscription *rs;
-	int family;
-	uint32_t fibnum;
 };
 
-void route_cache_init(struct route_cache *, int, uint32_t);
+void route_cache_init(struct route_cache *);
 void route_cache_uninit(struct route_cache *);
 void route_cache_invalidate(struct route_cache *);
-void route_cache_subscribe_rib_event(struct route_cache *);
+void route_cache_subscribe_rib_event(struct route_cache *, int, uint32_t);
 void route_cache_unsubscribe_rib_event(struct route_cache *);
 
 static inline struct route *

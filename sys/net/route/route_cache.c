@@ -83,12 +83,11 @@ SYSUNINIT(route_cache_pcpu_zone_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
     route_cache_pcpu_zone_uninit, NULL);
 
 void
-route_cache_init(struct route_cache *rc, int family, uint32_t fibnum)
+route_cache_init(struct route_cache *rc)
 {
 	int cpu;
 	struct route_cache_pcpu *pcpu, *rc_pcpu;
 
-	KASSERT((family != 0), ("family required"));
 	KASSERT((rc->pcpu == NULL), ("route cache has been inited"));
 	KASSERT((rc->rs == NULL), ("route cache has subscribed rib event"));
 	rc_pcpu = uma_zalloc_pcpu(route_cache_pcpu_zone, M_WAITOK | M_ZERO);
@@ -98,8 +97,6 @@ route_cache_init(struct route_cache *rc, int family, uint32_t fibnum)
 		pcpu->ro.ro_flags = RT_LLE_CACHE; /* Cache L2 as well */
 	}
 	rc->pcpu = rc_pcpu;
-	rc->family = family;
-	rc->fibnum = fibnum;
 }
 
 void
@@ -109,7 +106,6 @@ route_cache_uninit(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 
 	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
-	KASSERT((rc->family != 0), ("family required"));
 	KASSERT((rc->rs == NULL), ("should unsubscribe rib event before uninit"));
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
@@ -122,7 +118,6 @@ route_cache_uninit(struct route_cache *rc)
 	}
 	uma_zfree_pcpu(route_cache_pcpu_zone, rc->pcpu);
 	rc->pcpu = NULL;
-	rc->family = 0;
 }
 
 void
@@ -132,7 +127,6 @@ route_cache_invalidate(struct route_cache *rc)
 	struct route_cache_pcpu *pcpu;
 
 	KASSERT((rc->pcpu != NULL), ("route cache is not inited"));
-	KASSERT((rc->family != 0), ("family required"));
 	CPU_FOREACH(cpu) {
 		pcpu = zpcpu_get_cpu(rc->pcpu, cpu);
 		mtx_lock(&pcpu->mtx);
@@ -151,11 +145,11 @@ route_cache_subscription_cb(struct rib_head *rnh __unused,
 }
 
 void
-route_cache_subscribe_rib_event(struct route_cache *rc)
+route_cache_subscribe_rib_event(struct route_cache *rc, int family,
+    uint32_t fibnum)
 {
 	KASSERT((rc->rs == NULL), ("already subscribed rib event"));
-	KASSERT((rc->family != 0), ("family required"));
-	rc->rs = rib_subscribe(rc->fibnum, rc->family, route_cache_subscription_cb,
+	rc->rs = rib_subscribe(fibnum, family, route_cache_subscription_cb,
 	    rc, RIB_NOTIFY_IMMEDIATE, true);
 }
 
