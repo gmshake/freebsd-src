@@ -575,20 +575,12 @@ static const struct pr_family {
 struct prison_ip {
 	struct epoch_context ctx;
 	uint32_t	ips;
-#ifdef FUTURE_C
 	union {
-		struct in_addr pr_ip4[];
-		struct in6_addr pr_ip6[];
+		struct in_addr pr_ip4[0];
+		struct in6_addr pr_ip6[0];
 	};
-#else /* No future C :( */
-static __inline const char *
-PR_IP(struct prison_ip *pip, pr_family_t af, uint32_t i)
-{
-	return ((const char *)((pip) + 1) + pr_families[af].size * (i));
-}
-//#define	PR_IP(pip, i)	((const char *)((pip) + 1) + pr_families[af].size * (i))
-#define	PR_IPD(pip, i)	((char *)((pip) + 1) + pr_families[af].size * (i))
-#endif
+#define	PR_IP(pip, i)	((const struct in_addr *)&((pip)->pr_ip4i[(i)]))
+#define	PR_IPD(pip, i)	((struct in_addr *)&((pip)->pr_ip4i[(i)]))
 };
 
 static struct prison_ip *
