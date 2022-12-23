@@ -579,8 +579,8 @@ struct prison_ip {
 		struct in_addr pr_ip4[0];
 		struct in6_addr pr_ip6[0];
 	};
-#define	PR_IP(pip, i)	((const struct in_addr *)&((pip)->pr_ip4i[(i)]))
-#define	PR_IPD(pip, i)	((struct in_addr *)&((pip)->pr_ip4i[(i)]))
+#define	PR_IP(pip, i)	((const struct in_addr *)&((pip)->pr_ip4[(i)]))
+#define	PR_IPD(pip, i)	((struct in_addr *)&((pip)->pr_ip4[(i)]))
 };
 
 static struct prison_ip *
