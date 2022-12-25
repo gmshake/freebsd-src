@@ -654,7 +654,7 @@ prison_ip_dup(struct prison *ppr, struct prison *pr, const pr_family_t af)
 	if (ppr->pr_addrs[af] != NULL) {
 		pr->pr_addrs[af] = prison_ip_alloc(af,
 		    ppr->pr_addrs[af]->ips, M_WAITOK);
-		bcopy(ppr->pr_addrs[af], pr->pr_addrs[af],
+		bcopy(ppr->pr_addrs[af] + 1, pr->pr_addrs[af] + 1,
 		    pr->pr_addrs[af]->ips * pr_families[af].size);
 	}
 }
