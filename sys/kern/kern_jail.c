@@ -814,7 +814,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		alloced = false;
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
 		/* This has no user settings, so just copy the parent's list. */
-		bcopy(ppip, new, ips * size);
+		bcopy(ppip + 1, new + 1, ips * size);
 	} else {
 		/* Remove addresses that aren't in the parent. */
 		int i;
@@ -846,7 +846,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 				i++;
 				break;
 			case 0:
-				bcopy(PR_IP(pr, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
 				i++;
 				pi++;
 				ips++;
