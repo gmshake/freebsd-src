@@ -4857,11 +4857,11 @@ db_show_prison(struct prison *pr)
 #endif
 	unsigned f;
 #ifdef INET
-	struct in_addr *ip4;
+	struct prison_ip *pip4;
 	char ip4buf[INET_ADDRSTRLEN];
 #endif
 #ifdef INET6
-	struct in6_addr *ip6;
+	struct prison_ip *pip6;
 	char ip6buf[INET6_ADDRSTRLEN];
 #endif
 
@@ -4915,21 +4915,21 @@ db_show_prison(struct prison *pr)
 	db_printf(" host.hostuuid   = %s\n", pr->pr_hostuuid);
 	db_printf(" host.hostid     = %lu\n", pr->pr_hostid);
 #ifdef INET
-	if ((ip4 = pr->pr_addrs[PR_INET]) != NULL) {
-		db_printf(" ip4s            = %d\n", ip4->ips);
-		for (ii = 0; ii < ip4->ips; ii++)
+	if ((pip4 = pr->pr_addrs[PR_INET]) != NULL) {
+		db_printf(" ip4s            = %d\n", pip4->ips);
+		for (ii = 0; ii < pip4->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip4.addr        =" : "                 ",
-			    inet_ntoa_r(ip4->pr_ip4[ii], ip4buf));
+			    inet_ntoa_r(pip4->pr_ip4[ii], ip4buf));
 	}
 #endif
 #ifdef INET6
-	if ((ip6 = pr->pr_addrs[PR_INET6]) != NULL) {
-		db_printf(" ip6s            = %d\n", ip6->ips);
-		for (ii = 0; ii < ip6->ips; ii++)
+	if ((pip6 = pr->pr_addrs[PR_INET6]) != NULL) {
+		db_printf(" ip6s            = %d\n", pip6->ips);
+		for (ii = 0; ii < pip6->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip6.addr        =" : "                 ",
-			    ip6_sprintf(ip6buf, &ip6->pr_ip6[ii]));
+			    ip6_sprintf(ip6buf, &pip6->pr_ip6[ii]));
 	}
 #endif
 }
