@@ -585,7 +585,7 @@ struct prison_ip {
 		struct in6_addr pr_ip6[0];
 #endif
 	};
-#define	PR_IP(pip, i)	((const char *)((pip)->pr_ip + pr_families[af].size * (i)))
+#define	PR_IP(pip, i)	((const char *)(pip)->pr_ip + pr_families[af].size * (i))
 #define	PR_IPD(pip, i)	((pip)->pr_ip + pr_families[af].size * (i))
 };
 
