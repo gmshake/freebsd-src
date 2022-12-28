@@ -623,7 +623,7 @@ prison_ip_copyin(const pr_family_t af, void *op, uint32_t cnt)
 	 * address to connect from.
 	 */
 	if (cnt > 1)
-		qsort(PR_IP(pip, 1), cnt - 1, size, pr_families[af].cmp);
+		qsort(DPR_IP(pip, 1), cnt - 1, size, cmp);
 	/*
 	 * Check for duplicate addresses and do some simple
 	 * zero and broadcast checks. If users give other bogus
