@@ -623,7 +623,7 @@ prison_ip_copyin(const pr_family_t af, void *op, uint32_t cnt)
 	 * address to connect from.
 	 */
 	if (cnt > 1)
-		qsort(pip->pr_ip + size, cnt - 1, size, pr_families[af].cmp);
+		qsort(PR_IP(pip, 1), cnt - 1, size, pr_families[af].cmp);
 	/*
 	 * Check for duplicate addresses and do some simple
 	 * zero and broadcast checks. If users give other bogus
@@ -816,7 +816,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		alloced = false;
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
 		/* This has no user settings, so just copy the parent's list. */
-		bcopy(&ppip->pr_ip, &new->pr_ip, ips * size);
+		bcopy(ppip->pr_ip, new->pr_ip, ips * size);
 	} else {
 		/* Remove addresses that aren't in the parent. */
 		int i;
@@ -4168,6 +4168,7 @@ static void
 prison_ip_copyout(struct prison *pr, const pr_family_t af, void **out, int *len)
 {
 	const size_t size = pr_families[af].size;
+	const struct prison_ip *pip = pr->pr_addrs[af];
 
  again:
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
@@ -4854,14 +4855,13 @@ db_show_prison(struct prison *pr)
 	struct jailsys_flags *jsf;
 #if defined(INET) || defined(INET6)
 	int ii;
+	struct prison_ip *pip;
 #endif
 	unsigned f;
 #ifdef INET
-	struct prison_ip *pip4;
 	char ip4buf[INET_ADDRSTRLEN];
 #endif
 #ifdef INET6
-	struct prison_ip *pip6;
 	char ip6buf[INET6_ADDRSTRLEN];
 #endif
 
@@ -4915,21 +4915,21 @@ db_show_prison(struct prison *pr)
 	db_printf(" host.hostuuid   = %s\n", pr->pr_hostuuid);
 	db_printf(" host.hostid     = %lu\n", pr->pr_hostid);
 #ifdef INET
-	if ((pip4 = pr->pr_addrs[PR_INET]) != NULL) {
-		db_printf(" ip4s            = %d\n", pip4->ips);
-		for (ii = 0; ii < pip4->ips; ii++)
+	if ((pip = pr->pr_addrs[PR_INET]) != NULL) {
+		db_printf(" ip4s            = %d\n", pip->ips);
+		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip4.addr        =" : "                 ",
-			    inet_ntoa_r(pip4->pr_ip4[ii], ip4buf));
+			    inet_ntoa_r(pip->pr_ip4[ii], ip4buf));
 	}
 #endif
 #ifdef INET6
-	if ((pip6 = pr->pr_addrs[PR_INET6]) != NULL) {
-		db_printf(" ip6s            = %d\n", pip6->ips);
-		for (ii = 0; ii < pip6->ips; ii++)
+	if ((pip = pr->pr_addrs[PR_INET6]) != NULL) {
+		db_printf(" ip6s            = %d\n", pip->ips);
+		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip6.addr        =" : "                 ",
-			    ip6_sprintf(ip6buf, &pip6->pr_ip6[ii]));
+			    ip6_sprintf(ip6buf, &pip->pr_ip6[ii]));
 	}
 #endif
 }
