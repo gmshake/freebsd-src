@@ -4168,7 +4168,6 @@ static void
 prison_ip_copyout(struct prison *pr, const pr_family_t af, void **out, int *len)
 {
 	const size_t size = pr_families[af].size;
-	const struct prison_ip *pip = pr->pr_addrs[af];
 
  again:
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
