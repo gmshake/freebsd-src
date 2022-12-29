@@ -585,9 +585,19 @@ struct prison_ip {
 		struct in6_addr pr_ip6[0];
 #endif
 	};
-#define	PR_IP(pip, i)	((const char *)(pip)->pr_ip + pr_families[af].size * (i))
-#define	PR_IPD(pip, i)	((pip)->pr_ip + pr_families[af].size * (i))
 };
+
+static char *
+pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
+{
+	MPASS(family < PR_FAMILY_MAX);
+	MPASS(idx >= 0);
+
+	return (pip->pr_ip + pr_families[af].size * idx);
+}
+
+#define PR_IP(pip, i)	((const char *)pr_ip_get(pip, af, i))
+#define PR_IPD(pip, i)	(pr_ip_get(pip, af, i))
 
 static struct prison_ip *
 prison_ip_alloc(const pr_family_t af, uint32_t cnt, int flags)
