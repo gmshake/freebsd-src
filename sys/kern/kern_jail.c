@@ -588,9 +588,10 @@ struct prison_ip {
 };
 
 static char *
-pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
+pr_ip_get(struct prison_ip *pip, const pr_family_t af, int idx)
 {
-	MPASS(family < PR_FAMILY_MAX);
+	MPASS(pip);
+	MPASS(af < PR_FAMILY_MAX);
 	MPASS(idx >= 0);
 
 	return (pip->pr_ip + pr_families[af].size * idx);
