@@ -587,7 +587,7 @@ struct prison_ip {
 	};
 };
 
-static char *
+static const char *
 pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
 {
 	MPASS(pip);
@@ -597,8 +597,18 @@ pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
 	return (pip->pr_ip + pr_families[af].size * idx);
 }
 
-#define PR_IP(pip, i)	((const char *)pr_ip_get((pip), af, (i)))
-#define PR_IPD(pip, i)	(pr_ip_get((pip), af, (i)))
+static char *
+pr_ip_get_d(struct prison_ip *pip, const pr_family_t af, int idx)
+{
+	MPASS(pip);
+	MPASS(af < PR_FAMILY_MAX);
+	MPASS(idx >= 0);
+
+	return (pip->pr_ip + pr_families[af].size * idx);
+}
+
+#define PR_IP(pip, i)	(pr_ip_get((pip), af, (i)))
+#define PR_IPD(pip, i)	(pr_ip_get_d((pip), af, (i)))
 
 static struct prison_ip *
 prison_ip_alloc(const pr_family_t af, uint32_t cnt, int flags)
