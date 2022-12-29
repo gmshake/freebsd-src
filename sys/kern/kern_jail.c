@@ -800,32 +800,41 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 	 * screw up sorting, and in case of IPv6 we can't even atomically write
 	 * one.
 	 */
-	ips = (pr->pr_flags & pr_families[af].ip_flag) ? pip->ips : ppip->ips;
-	if (ips == 0) {
-		prison_ip_set(pr, af, NULL);
+	if (ppip == NULL) {
+		if (pip != NULL)
+			prison_ip_set(pr, af, NULL);
 		return (false);
 	}
-	if (new == NULL) {
-		new = prison_ip_alloc(af, ips, M_NOWAIT);
-		if (new == NULL)
-			return (true);
-		alloced = true;
-	} else
-		alloced = false;
+
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
+		if (new == NULL) {
+			new = prison_ip_alloc(af, ppip->ips, M_NOWAIT);
+			if (new == NULL)
+				return (true);
+			alloced = true;
+		} else
+			alloced = false;
 		/* This has no user settings, so just copy the parent's list. */
-		bcopy(ppip + 1, new + 1, ips * size);
-	} else {
+		bcopy(ppip + 1, new + 1, ppip->ips * size);
+	} else if (pip != NULL) {
 		/* Remove addresses that aren't in the parent. */
 		int i;
 
 		i = 0; /* index in pip */
 		ips = 0; /* index in new */
 
+		if (new == NULL) {
+			new = prison_ip_alloc(af, pip->ips, M_NOWAIT);
+			if (new == NULL)
+				return (true);
+			alloced = true;
+		} else
+			alloced = false;
+
 		for (int pi = 0; pi < ppip->ips; pi++)
 			if (cmp(PR_IP(pip, 0), PR_IP(ppip, pi)) == 0) {
 				/* Found our primary address in parent. */
-				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, 0), PR_IPD(new, 0), size);
 				i++;
 				ips++;
 				break;
@@ -860,6 +869,10 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			if (alloced)
 				prison_ip_free(new);
 			new = NULL;
+		} else {
+			KASSERT((new->ips >= ips),
+			    ("Out-of-bounds write to prison_ip %p", new));
+			new->ips = ips;
 		}
 	}
 	prison_ip_set(pr, af, new);
