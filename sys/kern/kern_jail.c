@@ -838,7 +838,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		for (int pi = 0; pi < ppip->ips; pi++)
 			if (cmp(PR_IP(pip, 0), PR_IP(ppip, pi)) == 0) {
 				/* Found our primary address in parent. */
-				bcopy(PR_IP(pip, 0), PR_IPD(new, 0), size);
+				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
 				i++;
 				ips++;
 				break;
