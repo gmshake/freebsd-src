@@ -777,7 +777,7 @@ prison_ip_set(struct prison *pr, const pr_family_t af, struct prison_ip *new)
 
 /*
  * Restrict a prison's IP address list with its parent's, possibly replacing
- * it.  Return true if the replacement buffer was used (or would have been).
+ * it.  Return true if the replacement buffer was used (or should redo).
  * kern_jail_set() helper.
  */
 static bool
