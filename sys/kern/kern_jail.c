@@ -789,7 +789,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 	int (*const cmp)(const void *, const void *) = pr_families[af].cmp;
 	const size_t size = pr_families[af].size;
 	uint32_t ips;
-	bool alloced;
+	bool alloced, used;
 
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
 
@@ -807,15 +807,17 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 	}
 
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
+		used = true;
 		if (new == NULL) {
 			new = prison_ip_alloc(af, ppip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (true);
-			alloced = true;
-		} else
-			alloced = false;
+				return (true); /* redo */
+			used = false;
+		}
 		/* This has no user settings, so just copy the parent's list. */
 		bcopy(ppip + 1, new + 1, ppip->ips * size);
+		prison_ip_set(pr, af, new);
+		return (used);
 	} else if (pip != NULL) {
 		/* Remove addresses that aren't in the parent. */
 		int i;
@@ -823,10 +825,12 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		i = 0; /* index in pip */
 		ips = 0; /* index in new */
 
+		used = true;
 		if (new == NULL) {
 			new = prison_ip_alloc(af, pip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (true);
+				return (true); /* redo */
+			used = false;
 			alloced = true;
 		} else
 			alloced = false;
@@ -869,14 +873,17 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			if (alloced)
 				prison_ip_free(new);
 			new = NULL;
+			used = false;
 		} else {
+			/* Shrink to real size */
 			KASSERT((new->ips >= ips),
 			    ("Out-of-bounds write to prison_ip %p", new));
 			new->ips = ips;
 		}
+		prison_ip_set(pr, af, new);
+		return (used);
 	}
-	prison_ip_set(pr, af, new);
-	return (new != NULL ? true : false);
+	return (false);
 }
 
 /*
