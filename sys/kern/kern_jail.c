@@ -777,19 +777,19 @@ prison_ip_set(struct prison *pr, const pr_family_t af, struct prison_ip *new)
 
 /*
  * Restrict a prison's IP address list with its parent's, possibly replacing
- * it.  Return true if the replacement buffer was used (or should redo).
+ * it.  Return true if succeed, otherwise should redo.
  * kern_jail_set() helper.
  */
 static bool
 prison_ip_restrict(struct prison *pr, const pr_family_t af,
-    struct prison_ip *new)
+    struct prison_ip **newp)
 {
 	const struct prison_ip *ppip = pr->pr_parent->pr_addrs[af];
 	const struct prison_ip *pip = pr->pr_addrs[af];
 	int (*const cmp)(const void *, const void *) = pr_families[af].cmp;
 	const size_t size = pr_families[af].size;
+	struct prison_ip *new = newp != NULL ? *newp : NULL;
 	uint32_t ips;
-	bool alloced, used;
 
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
 
@@ -803,22 +803,21 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 	if (ppip == NULL) {
 		if (pip != NULL)
 			prison_ip_set(pr, af, NULL);
-		return (false);
+		return (true);
 	}
 
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
 		if (new == NULL) {
 			new = prison_ip_alloc(af, ppip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (true); /* redo */
-			used = false;
-		} else
-			used = true;
+				return (false); /* redo */
+		}
 		/* This has no user settings, so just copy the parent's list. */
 		MPASS(new->ips == ppip->ips);
 		bcopy(ppip + 1, new + 1, ppip->ips * size);
 		prison_ip_set(pr, af, new);
-		return (used);
+		if (newp != NULL)
+			*newp = NULL; /* Used */
 	} else if (pip != NULL) {
 		/* Remove addresses that aren't in the parent. */
 		int i;
@@ -826,16 +825,10 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		i = 0; /* index in pip */
 		ips = 0; /* index in new */
 
-		used = true;
 		if (new == NULL) {
 			new = prison_ip_alloc(af, pip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (true); /* redo */
-			used = false;
-			alloced = true;
-		} else {
-			used = true;
-			alloced = false;
+				return (false); /* redo */
 		}
 
 		for (int pi = 0; pi < ppip->ips; pi++)
@@ -873,10 +866,9 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			}
 		}
 		if (ips == 0) {
-			if (alloced)
+			if (newp == NULL || *newp == NULL)
 				prison_ip_free(new);
 			new = NULL;
-			used = false;
 		} else {
 			/* Shrink to real size */
 			KASSERT((new->ips >= ips),
@@ -884,9 +876,10 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			new->ips = ips;
 		}
 		prison_ip_set(pr, af, new);
-		return (used);
+		if (newp != NULL)
+			*newp = NULL; /* Used */
 	}
-	return (false);
+	return (true);
 }
 
 /*
@@ -1876,7 +1869,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				continue;
 			}
 #endif
-			if (prison_ip_restrict(tpr, PR_INET, NULL)) {
+			if (!prison_ip_restrict(tpr, PR_INET, NULL)) {
 				redo_ip4 = 1;
 				descend = 0;
 			}
@@ -1896,7 +1889,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				continue;
 			}
 #endif
-			if (prison_ip_restrict(tpr, PR_INET6, NULL)) {
+			if (!prison_ip_restrict(tpr, PR_INET6, NULL)) {
 				redo_ip6 = 1;
 				descend = 0;
 			}
@@ -2051,12 +2044,8 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				continue;
 			}
 #endif
-			if (prison_ip_restrict(tpr, PR_INET, ip4)) {
-				if (ip4 != NULL)
-					ip4 = NULL;
-				else
-					redo_ip4 = 1;
-			}
+			if (!prison_ip_restrict(tpr, PR_INET, &ip4))
+				redo_ip4 = 1;
 		}
 		mtx_unlock(&pr->pr_mtx);
 	}
@@ -2074,12 +2063,8 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				continue;
 			}
 #endif
-			if (prison_ip_restrict(tpr, PR_INET6, ip6)) {
-				if (ip6 != NULL)
-					ip6 = NULL;
-				else
-					redo_ip6 = 1;
-			}
+			if (!prison_ip_restrict(tpr, PR_INET6, &ip6))
+				redo_ip6 = 1;
 		}
 		mtx_unlock(&pr->pr_mtx);
 	}
