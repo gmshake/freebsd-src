@@ -2034,6 +2034,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 #ifdef INET
 	while (redo_ip4) {
 		ip4s = pr->pr_addrs[PR_INET]->ips;
+		MPASS(ip4 == NULL);
 		ip4 = prison_ip_alloc(PR_INET, ip4s, M_WAITOK);
 		mtx_lock(&pr->pr_mtx);
 		redo_ip4 = 0;
@@ -2053,6 +2054,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 #ifdef INET6
 	while (redo_ip6) {
 		ip6s = pr->pr_addrs[PR_INET6]->ips;
+		MPASS(ip6 == NULL);
 		ip6 = prison_ip_alloc(PR_INET6, ip6s, M_WAITOK);
 		mtx_lock(&pr->pr_mtx);
 		redo_ip6 = 0;
