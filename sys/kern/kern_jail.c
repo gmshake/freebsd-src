@@ -810,7 +810,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		if (new == NULL) {
 			new = prison_ip_alloc(af, ppip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (false); /* redo */
+				return (false); /* Redo */
 		}
 		/* This has no user settings, so just copy the parent's list. */
 		MPASS(new->ips == ppip->ips);
@@ -828,7 +828,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		if (new == NULL) {
 			new = prison_ip_alloc(af, pip->ips, M_NOWAIT);
 			if (new == NULL)
-				return (false); /* redo */
+				return (false); /* Redo */
 		}
 
 		for (int pi = 0; pi < ppip->ips; pi++)
