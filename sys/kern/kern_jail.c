@@ -815,6 +815,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			used = false;
 		}
 		/* This has no user settings, so just copy the parent's list. */
+		MPASS(new->ips == ppip->ips);
 		bcopy(ppip + 1, new + 1, ppip->ips * size);
 		prison_ip_set(pr, af, new);
 		return (used);
