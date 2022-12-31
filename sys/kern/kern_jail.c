@@ -807,13 +807,13 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 	}
 
 	if (!(pr->pr_flags & pr_families[af].ip_flag)) {
-		used = true;
 		if (new == NULL) {
 			new = prison_ip_alloc(af, ppip->ips, M_NOWAIT);
 			if (new == NULL)
 				return (true); /* redo */
 			used = false;
-		}
+		} else
+			used = true;
 		/* This has no user settings, so just copy the parent's list. */
 		MPASS(new->ips == ppip->ips);
 		bcopy(ppip + 1, new + 1, ppip->ips * size);
@@ -833,8 +833,10 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 				return (true); /* redo */
 			used = false;
 			alloced = true;
-		} else
+		} else {
+			used = true;
 			alloced = false;
+		}
 
 		for (int pi = 0; pi < ppip->ips; pi++)
 			if (cmp(PR_IP(pip, 0), PR_IP(ppip, pi)) == 0) {
