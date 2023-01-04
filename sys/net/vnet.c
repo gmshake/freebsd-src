@@ -189,6 +189,8 @@ static TAILQ_HEAD(vnet_sysinit_head, vnet_sysinit) vnet_constructors =
 	TAILQ_HEAD_INITIALIZER(vnet_constructors);
 static TAILQ_HEAD(vnet_sysuninit_head, vnet_sysinit) vnet_destructors =
 	TAILQ_HEAD_INITIALIZER(vnet_destructors);
+static TAILQ_HEAD(vnet_shutdown_head, vnet_sysinit) vnet_shutdown_handlers =
+	TAILQ_HEAD_INITIALIZER(vnet_shutdown_handlers);
 
 struct sx		vnet_sysinit_sxlock;
 
@@ -215,6 +217,7 @@ SDT_PROBE_DEFINE2(vnet, functions, vnet_alloc, alloc, "int",
     "struct vnet *");
 SDT_PROBE_DEFINE2(vnet, functions, vnet_alloc, return,
     "int", "struct vnet *");
+// FIXME SDT_PROBE_DEFINE2 vnet_shutdown ?
 SDT_PROBE_DEFINE2(vnet, functions, vnet_destroy, entry,
     "int", "struct vnet *");
 SDT_PROBE_DEFINE1(vnet, functions, vnet_destroy, return,
@@ -265,6 +268,27 @@ vnet_alloc(void)
 }
 
 /*
+ * Shutdown a virtual network stack, prior to destroy.
+ */
+void
+vnet_shutdown(struct vnet *vnet)
+{
+	struct vnet_sysinit *vs;
+
+	/* Signal that VNET is being shutdown. */
+	vnet->vnet_shutdown = true;
+
+	CURVNET_SET_QUIET(vnet);
+	VNET_SYSINIT_RLOCK();
+	TAILQ_FOREACH_REVERSE(vs, &vnet_shutdown_handlers, vnet_shutdown_head,
+	    link) {
+		vs->func(vs->arg);
+	}
+	VNET_SYSINIT_RUNLOCK();
+	CURVNET_RESTORE();
+}
+
+/*
  * Destroy a virtual network stack.
  */
 void
@@ -278,9 +302,6 @@ vnet_destroy(struct vnet *vnet)
 	VNET_LIST_WLOCK();
 	LIST_REMOVE(vnet, vnet_le);
 	VNET_LIST_WUNLOCK();
-
-	/* Signal that VNET is being shutdown. */
-	vnet->vnet_shutdown = true;
 
 	CURVNET_SET_QUIET(vnet);
 	sx_xlock(&ifnet_detach_sxlock);
@@ -517,6 +538,52 @@ vnet_deregister_sysinit(void *arg)
 	/* Remove the constructor from the global list of vnet constructors. */
 	VNET_SYSINIT_WLOCK();
 	TAILQ_REMOVE(&vnet_constructors, vs, link);
+	VNET_SYSINIT_WUNLOCK();
+}
+
+void
+vnet_register_shutdown(void *arg)
+{
+	struct vnet_sysinit *vs, *vs2;
+
+	vs = arg;
+
+	/* Add the shutdown handler to the global list of vnet shutdown handlers. */
+	VNET_SYSINIT_WLOCK();
+	TAILQ_FOREACH(vs2, &vnet_shutdown_handlers, link) {
+		if (vs2->subsystem > vs->subsystem)
+			break;
+		if (vs2->subsystem == vs->subsystem && vs2->order > vs->order)
+			break;
+	}
+	if (vs2 != NULL)
+		TAILQ_INSERT_BEFORE(vs2, vs, link);
+	else
+		TAILQ_INSERT_TAIL(&vnet_shutdown_handlers, vs, link);
+	VNET_SYSINIT_WUNLOCK();
+}
+
+void
+vnet_deregister_shutdown(void *arg)
+{
+	struct vnet_sysinit *vs;
+	struct vnet *vnet;
+
+	vs = arg;
+
+	/*
+	 * Invoke the shutdown handler on all the existing vnets when it is
+	 * deregistered.
+	 */
+	VNET_SYSINIT_WLOCK();
+	VNET_FOREACH(vnet) {
+		CURVNET_SET_QUIET(vnet);
+		vs->func(vs->arg);
+		CURVNET_RESTORE();
+	}
+
+	/* Remove the destructor from the global list of vnet destructors. */
+	TAILQ_REMOVE(&vnet_shutdown_handlers, vs, link);
 	VNET_SYSINIT_WUNLOCK();
 }
 

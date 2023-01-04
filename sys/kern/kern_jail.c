@@ -3322,6 +3322,10 @@ prison_cleanup(struct prison *pr)
 	mtx_assert(&pr->pr_mtx, MA_NOTOWNED);
 	shm_remove_prison(pr);
 	(void)osd_jail_call(pr, PR_METHOD_REMOVE, NULL);
+#ifdef VIMAGE
+	if (pr->pr_vnet != pr->pr_parent->pr_vnet)
+		vnet_shutdown(pr->pr_vnet);
+#endif
 }
 
 /*

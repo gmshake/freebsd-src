@@ -166,9 +166,10 @@ __GLOBL(__stop_set_vnet);
 #define	VNET_STOP	(uintptr_t)&__stop_set_vnet
 
 /*
- * Functions to allocate and destroy virtual network stacks.
+ * Functions to allocate, shutdown and destroy virtual network stacks.
  */
 struct vnet *vnet_alloc(void);
+void	vnet_shutdown(struct vnet *vnet);
 void	vnet_destroy(struct vnet *vnet);
 
 /*
@@ -360,6 +361,20 @@ struct vnet_sysinit {
 	SYSUNINIT(vnet_uninit_ ## ident, subsystem, order,		\
 	    vnet_deregister_sysuninit, &ident ## _vnet_uninit)
 
+#define	VNET_SHUTDOWN(ident, subsystem, order, func, arg)		\
+	CTASSERT((subsystem) > SI_SUB_VNET &&				\
+	    (subsystem) <= SI_SUB_VNET_DONE);				\
+	static struct vnet_sysinit ident ## _vnet_shutdown = {		\
+		subsystem,						\
+		order,							\
+		(sysinit_cfunc_t)(sysinit_nfunc_t)func,			\
+		(arg)							\
+	};								\
+	SYSINIT(vnet_shutdown_ ## ident, subsystem, order,		\
+	    vnet_register_shutdown, &ident ## _vnet_shutdown);		\
+	SYSUNINIT(vnet_shutdown_ ## ident, subsystem, order,		\
+	    vnet_deregister_shutdown, &ident ## _vnet_shutdown)
+
 /*
  * Run per-vnet sysinits or sysuninits during vnet creation/destruction.
  */
@@ -367,11 +382,13 @@ void	 vnet_sysinit(void);
 void	 vnet_sysuninit(void);
 
 /*
- * Interfaces for managing per-vnet constructors and destructors.
+ * Interfaces for managing per-vnet constructors, shutdown handlers and destructors.
  */
 void	vnet_register_sysinit(void *arg);
+void	vnet_register_shutdown(void *arg);
 void	vnet_register_sysuninit(void *arg);
 void	vnet_deregister_sysinit(void *arg);
+void	vnet_deregister_shutdown(void *arg);
 void	vnet_deregister_sysuninit(void *arg);
 
 /*
@@ -449,7 +466,7 @@ do {									\
 	SYSINIT(ident, subsystem, order, func, arg)
 #define	VNET_SYSUNINIT(ident, subsystem, order, func, arg)		\
 	SYSUNINIT(ident, subsystem, order, func, arg)
-
+#define	VNET_SHUTDOWN(ident, subsystem, order, func, arg)
 /*
  * Without VIMAGE revert to the default implementation.
  */
