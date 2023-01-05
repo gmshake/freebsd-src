@@ -521,7 +521,7 @@ vnet_if_return(const void *unused __unused)
 
 	free(pending, M_IFNET);
 }
-VNET_SYSUNINIT(vnet_if_return, SI_SUB_VNET_DONE, SI_ORDER_ANY,
+VNET_SHUTDOWN(vnet_if_return, SI_SUB_PROTO_IF, SI_ORDER_ANY,
     vnet_if_return, NULL);
 #endif
 
