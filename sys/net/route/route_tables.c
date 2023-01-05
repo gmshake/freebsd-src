@@ -316,9 +316,6 @@ VNET_SHUTDOWN(rtables_flush, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
 static void
 rtables_destroy(const void *unused __unused)
 {
-	// FIXME Need re-flush route entries ?
-	//rtables_flush(NULL);
-
 	/*
 	 * dom_rtdetach calls rt_table_destroy(), which
 	 *  schedules deletion for all rtentries, nexthops and control
