@@ -366,8 +366,6 @@ VNET_SHUTDOWN(ip6_shutdown, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip6_shutdown, N
 static void
 ip6_destroy(void *unused __unused)
 {
-	struct ifaddr *ifa, *nifa;
-	struct ifnet *ifp;
 	int error;
 
 #ifdef RSS
