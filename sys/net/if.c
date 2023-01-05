@@ -276,7 +276,6 @@ static void	if_attachdomain(void *);
 static void	if_attachdomain1(struct ifnet *);
 static int	ifconf(u_long, caddr_t);
 static void	if_input_default(struct ifnet *, struct mbuf *);
-static void	if_purgemaddrs(struct ifnet *ifp);
 static int	if_requestencap_default(struct ifnet *, struct if_encap_req *);
 static void	if_route(struct ifnet *, int flag, int fam);
 static int	if_setflag(struct ifnet *, int, int, int *, int);
@@ -477,36 +476,6 @@ if_unlink_ifnet(struct ifnet *ifp, bool vmove)
 }
 
 #ifdef VIMAGE
-static void
-vnet_if_purgeaddrs(struct ifnet *ifp)
-{
-	NET_EPOCH_WAIT();
-	NET_EPOCH_DRAIN_CALLBACKS();
-
-	if_down(ifp);
-	if_purgeaddrs(ifp);
-	if_purgemaddrs(ifp);
-	rt_flushifroutes(ifp);
-	// FIXME igmp_domifdetach() mld_domifdetach() ?
-	//igmp_domifdetach(ifp);
-	//mld_domifdetach(ifp);
-}
-
-static void
-vnet_if_shutdown(const void *unused __unused)
-{
-	struct ifnet *ifp;
-
-	IFNET_RLOCK();
-	/* Purge all addresses */
-	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
-		vnet_if_purgeaddrs(ifp);
-	}
-	IFNET_RUNLOCK();
-}
-VNET_SHUTDOWN(vnet_if_shutdown, SI_SUB_VNET_DONE, SI_ORDER_ANY,
-    vnet_if_shutdown, NULL);
-
 static void
 vnet_if_return(const void *unused __unused)
 {

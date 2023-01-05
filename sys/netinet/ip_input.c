@@ -379,6 +379,17 @@ SYSINIT(ip_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip_init, NULL);
 
 #ifdef VIMAGE
 static void
+ip_shutdown(void *unused __unused)
+{
+	/* Remove the IPv4 addresses from all interfaces. */
+	in_ifscrub_all();
+
+	/* Make sure the IPv4 routes are gone as well. */
+	rib_flush_routes_family(AF_INET);
+}
+VNET_SHUTDOWN(ip_shutdown, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip_shutdown, NULL);
+
+static void
 ip_destroy(void *unused __unused)
 {
 	int error;
@@ -401,12 +412,6 @@ ip_destroy(void *unused __unused)
 		    "type HHOOK_TYPE_IPSEC_OUT, id HHOOK_IPSEC_INET: "
 		    "error %d returned\n", __func__, error);
 	}
-
-	/* Remove the IPv4 addresses from all interfaces. */
-	in_ifscrub_all();
-
-	/* Make sure the IPv4 routes are gone as well. */
-	rib_flush_routes_family(AF_INET);
 
 	/* Destroy IP reassembly queue. */
 	ipreass_destroy();

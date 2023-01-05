@@ -336,6 +336,31 @@ ip6proto_unregister(uint8_t proto)
 
 #ifdef VIMAGE
 static void
+ip6_shutdown(void *unused __unused)
+{
+	/* Cleanup addresses. */
+	IFNET_RLOCK();
+	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
+		/* Cannot lock here - lock recursion. */
+		/* IF_ADDR_LOCK(ifp); */
+		CK_STAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, nifa) {
+			if (ifa->ifa_addr->sa_family != AF_INET6)
+				continue;
+			in6_purgeaddr(ifa);
+		}
+		/* IF_ADDR_UNLOCK(ifp); */
+		// FIXME in6_ifdetach() or in6_ifdetach_destroy() ?
+		in6_ifdetach(ifp);
+		mld_domifdetach(ifp);
+	}
+	IFNET_RUNLOCK();
+
+	/* Make sure any routes are gone as well. */
+	rib_flush_routes_family(AF_INET6);
+}
+VNET_SHUTDOWN(ip6_shutdown, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip6_shutdown, NULL);
+
+static void
 ip6_destroy(void *unused __unused)
 {
 	struct ifaddr *ifa, *nifa;
@@ -360,25 +385,6 @@ ip6_destroy(void *unused __unused)
 		    "type HHOOK_TYPE_IPSEC_OUT, id HHOOK_IPSEC_INET6: "
 		    "error %d returned\n", __func__, error);
 	}
-
-	/* Cleanup addresses. */
-	IFNET_RLOCK();
-	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
-		/* Cannot lock here - lock recursion. */
-		/* IF_ADDR_LOCK(ifp); */
-		CK_STAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, nifa) {
-			if (ifa->ifa_addr->sa_family != AF_INET6)
-				continue;
-			in6_purgeaddr(ifa);
-		}
-		/* IF_ADDR_UNLOCK(ifp); */
-		in6_ifdetach_destroy(ifp);
-		mld_domifdetach(ifp);
-	}
-	IFNET_RUNLOCK();
-
-	/* Make sure any routes are gone as well. */
-	rib_flush_routes_family(AF_INET6);
 
 	frag6_destroy();
 	nd6_destroy();

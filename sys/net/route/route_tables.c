@@ -303,12 +303,15 @@ rtables_flush(const void *unused __unused)
 		for (int i = 0; i < V_rt_numfibs; i++) {
 			rnh = rt_tables_get_rnh(i, family);
 			dom->dom_rtdetach(rnh);
+			// FIXME give other components a chance to cleanup nh ref ?
+			// XXX RIB_NOTIFY_DELAYED ?
+			// rib_notify(rnh, RIB_NOTIFY_IMMEDIATE, NULL);
 		}
 	}
 	RTABLES_UNLOCK();
 }
-VNET_SHUTDOWN(rtables_flush, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
-    rtables_flush, 0);
+VNET_SHUTDOWN(rtables_flush, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY,
+    rtables_flush, NULL);
 
 static void
 rtables_destroy(const void *unused __unused)
