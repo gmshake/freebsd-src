@@ -338,6 +338,9 @@ ip6proto_unregister(uint8_t proto)
 static void
 ip6_shutdown(void *unused __unused)
 {
+	struct ifaddr *ifa, *nifa;
+	struct ifnet *ifp;
+
 	/* Cleanup addresses. */
 	IFNET_RLOCK();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
