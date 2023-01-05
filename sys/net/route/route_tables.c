@@ -289,7 +289,7 @@ VNET_SYSINIT(vnet_rtables_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FOURTH,
 
 #ifdef VIMAGE
 static void
-rtables_destroy(const void *unused __unused)
+rtables_flush(const void *unused __unused)
 {
 	struct rib_head *rnh;
 	struct domain *dom;
@@ -306,6 +306,15 @@ rtables_destroy(const void *unused __unused)
 		}
 	}
 	RTABLES_UNLOCK();
+}
+VNET_SHUTDOWN(rtables_flush, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
+    rtables_flush, 0);
+
+static void
+rtables_destroy(const void *unused __unused)
+{
+	// FIXME Need re-flush route entries ?
+	//rtables_flush(NULL);
 
 	/*
 	 * dom_rtdetach calls rt_table_destroy(), which
