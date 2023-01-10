@@ -575,16 +575,16 @@ static const struct pr_family {
 struct prison_ip {
 	struct epoch_context ctx;
 	uint32_t	ips;
-	// XXX Variable-length automatic arrays are supported in future C
+#ifdef FUTURE_C
+	// XXX Variable-length automatic arrays in union may be supported in future C
 	union {
-		char pr_ip[0];
-#ifdef INET
-		struct in_addr pr_ip4[0];
-#endif
-#ifdef INET6
-		struct in6_addr pr_ip6[0];
-#endif
+		char pr_ip[];
+		struct in_addr pr_ip4[];
+		struct in6_addr pr_ip6[];
 	};
+#else
+	char pr_ip[];
+#endif
 };
 
 static const char *
@@ -2383,14 +2383,14 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 	if (error != 0 && error != ENOENT)
 		goto done;
 #ifdef INET
-	error = vfs_setopt_part(opts, "ip4.addr", pr->pr_addrs[PR_INET]->pr_ip4,
+	error = vfs_setopt_part(opts, "ip4.addr", pr->pr_addrs[PR_INET]->pr_ip,
 	    pr->pr_addrs[PR_INET] ? pr->pr_addrs[PR_INET]->ips *
 	    pr_families[PR_INET].size : 0 );
 	if (error != 0 && error != ENOENT)
 		goto done;
 #endif
 #ifdef INET6
-	error = vfs_setopt_part(opts, "ip6.addr", pr->pr_addrs[PR_INET6]->pr_ip6,
+	error = vfs_setopt_part(opts, "ip6.addr", pr->pr_addrs[PR_INET6]->pr_ip,
 	    pr->pr_addrs[PR_INET6] ? pr->pr_addrs[PR_INET6]->ips *
 	    pr_families[PR_INET6].size : 0 );
 	if (error != 0 && error != ENOENT)
@@ -4940,7 +4940,8 @@ db_show_prison(struct prison *pr)
 		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip4.addr        =" : "                 ",
-			    inet_ntoa_r(pip->pr_ip4[ii], ip4buf));
+			    inet_ntoa_r(
+			    *(const struct in_addr *)PR_IP(pip, ii), ip4buf));
 	}
 #endif
 #ifdef INET6
@@ -4949,7 +4950,8 @@ db_show_prison(struct prison *pr)
 		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
 			    ii == 0 ? "ip6.addr        =" : "                 ",
-			    ip6_sprintf(ip6buf, &pip->pr_ip6[ii]));
+			    ip6_sprintf(ip6buf,
+			    (const struct in6_addr *)PR_IP(pip, ii)));
 	}
 #endif
 }
