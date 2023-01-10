@@ -576,13 +576,16 @@ struct prison_ip {
 	struct epoch_context ctx;
 	uint32_t	ips;
 #ifdef FUTURE_C
-	// XXX Variable-length automatic arrays in union may be supported in future C
+	/*
+	 * XXX Variable-length automatic arrays in union may be
+	 * supported in future C.
+	 */
 	union {
 		char pr_ip[];
 		struct in_addr pr_ip4[];
 		struct in6_addr pr_ip6[];
 	};
-#else
+#else /* No future C :( */
 	char pr_ip[];
 #endif
 };
@@ -592,7 +595,7 @@ pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
 {
 	MPASS(pip);
 	MPASS(af < PR_FAMILY_MAX);
-	MPASS(idx >= 0);
+	MPASS(idx >= 0 && idx < pip->ips);
 
 	return (pip->pr_ip + pr_families[af].size * idx);
 }
@@ -602,7 +605,7 @@ pr_ip_get_d(struct prison_ip *pip, const pr_family_t af, int idx)
 {
 	MPASS(pip);
 	MPASS(af < PR_FAMILY_MAX);
-	MPASS(idx >= 0);
+	MPASS(idx >= 0 && idx < pip->ips);
 
 	return (pip->pr_ip + pr_families[af].size * idx);
 }
@@ -4936,6 +4939,7 @@ db_show_prison(struct prison *pr)
 	db_printf(" host.hostid     = %lu\n", pr->pr_hostid);
 #ifdef INET
 	if ((pip = pr->pr_addrs[PR_INET]) != NULL) {
+		pr_family_t af = PR_INET;
 		db_printf(" ip4s            = %d\n", pip->ips);
 		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
@@ -4946,6 +4950,7 @@ db_show_prison(struct prison *pr)
 #endif
 #ifdef INET6
 	if ((pip = pr->pr_addrs[PR_INET6]) != NULL) {
+		pr_family_t af = PR_INET6;
 		db_printf(" ip6s            = %d\n", pip->ips);
 		for (ii = 0; ii < pip->ips; ii++)
 			db_printf(" %s %s\n",
