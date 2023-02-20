@@ -590,18 +590,8 @@ struct prison_ip {
 #endif
 };
 
-static const char *
-pr_ip_get(const struct prison_ip *pip, const pr_family_t af, int idx)
-{
-	MPASS(pip);
-	MPASS(af < PR_FAMILY_MAX);
-	MPASS(idx >= 0 && idx < pip->ips);
-
-	return (pip->pr_ip + pr_families[af].size * idx);
-}
-
 static char *
-pr_ip_get_d(struct prison_ip *pip, const pr_family_t af, int idx)
+pr_ip_get(struct prison_ip *pip, const pr_family_t af, int idx)
 {
 	MPASS(pip);
 	MPASS(af < PR_FAMILY_MAX);
@@ -611,7 +601,6 @@ pr_ip_get_d(struct prison_ip *pip, const pr_family_t af, int idx)
 }
 
 #define PR_IP(pip, i)	(pr_ip_get((pip), af, (i)))
-#define PR_IPD(pip, i)	(pr_ip_get_d((pip), af, (i)))
 
 static struct prison_ip *
 prison_ip_alloc(const pr_family_t af, uint32_t cnt, int flags)
@@ -851,7 +840,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 		for (int pi = 0; pi < ppip->ips; pi++)
 			if (cmp(PR_IP(pip, 0), PR_IP(ppip, pi)) == 0) {
 				/* Found our primary address in parent. */
-				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, i), PR_IP(new, ips), size);
 				i++;
 				ips++;
 				break;
@@ -860,7 +849,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 			/* Check against primary, which is unsorted. */
 			if (cmp(PR_IP(pip, i), PR_IP(ppip, 0)) == 0) {
 				/* Matches parent's primary address. */
-				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, i), PR_IP(new, ips), size);
 				i++;
 				ips++;
 				continue;
@@ -872,7 +861,7 @@ prison_ip_restrict(struct prison *pr, const pr_family_t af,
 				i++;
 				break;
 			case 0:
-				bcopy(PR_IP(pip, i), PR_IPD(new, ips), size);
+				bcopy(PR_IP(pip, i), PR_IP(new, ips), size);
 				i++;
 				pi++;
 				ips++;
