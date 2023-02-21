@@ -681,8 +681,8 @@ prison_ip_dup(struct prison *ppr, struct prison *pr, const pr_family_t af)
  * kern_jail_set() helper.
  */
 static bool
-prison_ip_parent_match(const struct prison_ip *ppip,
-    const struct prison_ip *pip, const pr_family_t af)
+prison_ip_parent_match(struct prison_ip *ppip, struct prison_ip *pip,
+    const pr_family_t af)
 {
 	prison_addr_cmp_t *const cmp = pr_families[af].cmp;
 	int i, j;
@@ -724,7 +724,7 @@ prison_ip_parent_match(const struct prison_ip *ppip,
  */
 static bool
 prison_ip_conflict_check(const struct prison *ppr, const struct prison *pr,
-    const struct prison_ip *pip, pr_family_t af)
+    struct prison_ip *pip, pr_family_t af)
 {
 	const struct prison *tppr, *tpr;
 	int descend;
@@ -799,8 +799,8 @@ static bool
 prison_ip_restrict(struct prison *pr, const pr_family_t af,
     struct prison_ip *new)
 {
-	const struct prison_ip *ppip = pr->pr_parent->pr_addrs[af];
-	const struct prison_ip *pip = pr->pr_addrs[af];
+	struct prison_ip *ppip = pr->pr_parent->pr_addrs[af];
+	struct prison_ip *pip = pr->pr_addrs[af];
 	int (*const cmp)(const void *, const void *) = pr_families[af].cmp;
 	const size_t size = pr_families[af].size;
 	uint32_t ips;
@@ -889,7 +889,7 @@ prison_ip_check(const struct prison *pr, const pr_family_t af,
     const void *addr)
 {
 	int (*const cmp)(const void *, const void *) = pr_families[af].cmp;
-	const struct prison_ip *pip;
+	struct prison_ip *pip;
 	int i, a, z, d;
 
 	MPASS(mtx_owned(&pr->pr_mtx) ||
@@ -931,7 +931,7 @@ prison_ip_check(const struct prison *pr, const pr_family_t af,
 const void *
 prison_ip_get0(const struct prison *pr, const pr_family_t af)
 {
-	const struct prison_ip *pip = pr->pr_addrs[af];
+	struct prison_ip *pip = pr->pr_addrs[af];
 
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
 	MPASS(pip);
