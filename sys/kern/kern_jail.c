@@ -931,7 +931,7 @@ prison_ip_check(const struct prison *pr, const pr_family_t af,
 const void *
 prison_ip_get0(const struct prison *pr, const pr_family_t af)
 {
-	struct prison_ip *pip = pr->pr_addrs[af];
+	const struct prison_ip *pip = pr->pr_addrs[af];
 
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
 	MPASS(pip);
