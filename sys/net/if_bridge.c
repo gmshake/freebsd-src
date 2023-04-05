@@ -461,10 +461,10 @@ SYSCTL_INT(_net_link_bridge, OID_AUTO, allow_llz_overlap,
     "zones of a bridge interface and the member interfaces");
 
 /* log MAC address port flapping */
-VNET_DEFINE_STATIC(int, log_mac_flap) = 1;
+VNET_DEFINE_STATIC(bool, log_mac_flap) = true;
 #define	V_log_mac_flap	VNET(log_mac_flap)
-SYSCTL_INT(_net_link_bridge, OID_AUTO, log_mac_flap,
-    CTLFLAG_RWTUN | CTLFLAG_VNET, &VNET_NAME(log_mac_flap), 0,
+SYSCTL_BOOL(_net_link_bridge, OID_AUTO, log_mac_flap,
+    CTLFLAG_RW | CTLFLAG_VNET, &VNET_NAME(log_mac_flap), true,
     "Log MAC address port flapping");
 
 VNET_DEFINE_STATIC(int, log_interval) = 5;
