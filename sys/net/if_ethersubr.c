@@ -461,6 +461,22 @@ ether_set_pcp(struct mbuf **mp, struct ifnet *ifp, uint8_t pcp)
 	return (false);
 }
 
+static inline bool
+ether_do_pcp(struct ifnet *ifp, const struct mbuf *m)
+{
+	if (ifp->if_type == IFT_L2VLAN)
+		return (false);
+
+	if (ifp->if_pcp != IFNET_PCP_NONE || (m->m_flags & M_VLANTAG))
+		return (true);
+
+	if (V_vlan_mtag_pcp &&
+	    m_tag_locate(m, MTAG_8021Q, MTAG_8021Q_PCP_OUT, NULL) != NULL)
+		return (true);
+
+	return (false);
+}
+
 /*
  * Ethernet link layer output routine to send a raw frame to the device.
  *
@@ -470,11 +486,7 @@ ether_set_pcp(struct mbuf **mp, struct ifnet *ifp, uint8_t pcp)
 int
 ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 {
-	uint8_t pcp;
-
-	pcp = ifp->if_pcp;
-	if (pcp != IFNET_PCP_NONE && ifp->if_type != IFT_L2VLAN &&
-	    !ether_set_pcp(&m, ifp, pcp))
+	if (ether_do_pcp(ifp, m) && !ether_set_pcp(&m, ifp, ifp->if_pcp))
 		return (0);
 
 	if (PFIL_HOOKED_OUT(V_link_pfil_head))
