@@ -111,7 +111,7 @@ static int ifc_simple_match(struct if_clone *ifc, const char *name);
 static int ifc_handle_unit(struct if_clone *ifc, char *name, size_t len, int *punit);
 static struct if_clone *ifc_find_cloner(const char *name);
 static struct if_clone *ifc_find_cloner_match(const char *name);
-static void ifc_free_oldunit(struct if_clone *ifc, struct ifnet *ifp)
+static void ifc_free_oldunit(struct if_clone *ifc, struct ifnet *ifp);
 
 #ifdef CLONE_COMPAT_13
 static int ifc_simple_create_wrapper(struct if_clone *ifc, char *name, size_t maxlen,
