@@ -2770,7 +2770,15 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 		IF_ADDR_WLOCK(ifp);
 		strlcpy(old_name, ifp->if_xname, sizeof(old_name));
-		strlcpy(ifp->if_xname, new_name, sizeof(ifp->if_xname));
+		error = ifc_rename_ifp(ifp, new_name);
+		if (error != 0) {
+			IF_ADDR_WUNLOCK(ifp);
+
+			EVENTHANDLER_INVOKE(ifnet_arrival_event, ifp);
+
+			ifp->if_flags &= ~IFF_RENAMING;
+			return (error);
+		}
 		ifa = ifp->if_addr;
 		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 		namelen = strlen(new_name);
