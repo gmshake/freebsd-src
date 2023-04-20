@@ -783,7 +783,7 @@ void
 ifc_free_unit(struct if_clone *ifc, int unit)
 {
 
-	KASSERT((unit != IF_DUNIT_NONE), "Invalid unit")
+	KASSERT(unit != IF_DUNIT_NONE, ("Invalid unit"));
 	free_unr(ifc->ifc_unrhdr, unit);
 	IF_CLONE_REMREF(ifc);
 }
