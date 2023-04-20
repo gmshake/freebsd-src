@@ -111,7 +111,6 @@ static int ifc_simple_match(struct if_clone *ifc, const char *name);
 static int ifc_handle_unit(struct if_clone *ifc, char *name, size_t len, int *punit);
 static struct if_clone *ifc_find_cloner(const char *name);
 static struct if_clone *ifc_find_cloner_match(const char *name);
-static void ifc_free_oldunit(struct if_clone *ifc, struct ifnet *ifp);
 
 #ifdef CLONE_COMPAT_13
 static int ifc_simple_create_wrapper(struct if_clone *ifc, char *name, size_t maxlen,
@@ -378,20 +377,15 @@ if_clone_destroyif_flags(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags
 		return (ENXIO);		/* ifp is not on the list. */
 	}
 
+	int unit = ifp->if_dunit;
 	err = (*ifc->ifc_destroy)(ifc, ifp, flags);
 
 	if (err != 0)
 		ifc_link_ifp(ifc, ifp);
-	else {
-		ifc_free_oldunit(ifc, ifp);
-		/* The interface might be renamed, try release unit number of that cloner */
-		nifc = ifc_find_cloner_match(ifp->if_xname);
-		if (nifc != NULL && nifc != ifc && nifc->ifc_flags & IFC_F_AUTOUNIT) {
-			int unit = -1;
-			ifc_name2unit(ifp->if_xname, &unit);
-			if (unit >= 0)
-				free_unr(nifc->ifc_unrhdr, unit);
-		}
+	else if (ifc->ifc_flags & IFC_F_AUTOUNIT) {
+		if (unit != IF_DUNIT_NONE)
+			free_unr(ifc->ifc_unrhdr, unit);
+		IF_CLONE_REMREF(ifc);
 	}
 	CURVNET_RESTORE();
 	return (err);
@@ -527,8 +521,6 @@ ifc_simple_create_wrapper(struct if_clone *ifc, char *name, size_t maxlen,
 static int
 ifc_simple_destroy_wrapper(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
-	if (ifp->if_dunit < ifc->ifcs_minifs && (flags & IFC_F_FORCE) == 0)
-		return (EINVAL);
 
 	ifc->ifcs_destroy(ifp);
 	return (0);
@@ -791,6 +783,7 @@ void
 ifc_free_unit(struct if_clone *ifc, int unit)
 {
 
+	KASSERT((unit != IF_DUNIT_NONE), "Invalid unit")
 	free_unr(ifc->ifc_unrhdr, unit);
 	IF_CLONE_REMREF(ifc);
 }
@@ -883,15 +876,6 @@ ifc_flags_get(struct if_clone *ifc)
 	return (ifc->ifc_flags);
 }
 
-static void
-ifc_free_oldunit(struct if_clone *ifc, struct ifnet *ifp)
-{
-	if (ifc->ifc_flags & IFC_F_AUTOUNIT && ifp->if_dunit != IF_DUNIT_NONE) {
-		free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
-		ifp->if_dunit = IF_DUNIT_NONE;
-	}
-}
-
 int
 ifc_rename_ifp(struct ifnet *ifp, char *new_name)
 {
@@ -907,37 +891,29 @@ ifc_rename_ifp(struct ifnet *ifp, char *new_name)
 		return (EINVAL);
 
 	ifc_name2unit(new_name, &unit);
-	if (unit < 0) {
-		/* No valid unit, go directly */
-		strlcpy(ifp->if_xname, new_name, sizeof(ifp->if_xname));
-		ifc_free_oldunit(oifc, ifp);
-		return (0);
+
+	if (unit >= 0) {
+		CURVNET_SET_QUIET(ifp->if_vnet);
+		ifc = ifc_find_cloner_match(new_name);
+		CURVNET_RESTORE();
+
+		if (ifc == oifc && (ifc->ifc_flags & IFC_F_AUTOUNIT)) {
+			if (unit > ifc->ifc_maxunit)
+				return (ENOSPC);
+
+			if (alloc_unr_specific(ifc->ifc_unrhdr, unit) == -1)
+				return (EEXIST);
+
+			free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+			ifp->if_dunit = unit;
+			return (0);
+		}
 	}
 
-	/* Try to find an existing applicable cloner for this request */
-	CURVNET_SET_QUIET(ifp->if_vnet);
-	ifc = ifc_find_cloner_match(new_name);
-	CURVNET_RESTORE();
-	if (ifc == NULL || (ifc->ifc_flags & IFC_F_AUTOUNIT) == 0) {
-		/* No match, no conflicts, or cloner does not support auto unit number, go directly */
-		strlcpy(ifp->if_xname, new_name, sizeof(ifp->if_xname));
-		ifc_free_oldunit(oifc, ifp);
-		return (0);
+	if (oifc->ifc_flags & IFC_F_AUTOUNIT && ifp->if_dunit != IF_DUNIT_NONE) {
+		free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+		ifp->if_dunit = IF_DUNIT_NONE;
 	}
-
-	/* Have cloner for new name, try to apply unit number */
-	if (unit > ifc->ifc_maxunit)
-		return (ENOSPC);
-
-	if (alloc_unr_specific(ifc->ifc_unrhdr, unit) == -1)
-		return (EEXIST);
-
-	strlcpy(ifp->if_xname, new_name, sizeof(ifp->if_xname));
-	ifc_free_oldunit(oifc, ifp);
-
-	/* Reference the new unit number */
-	if (ifc == oifc)
-		ifp->if_dunit = unit;
 
 	return (0);
 }
