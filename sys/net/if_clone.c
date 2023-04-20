@@ -363,7 +363,6 @@ static int
 if_clone_destroyif_flags(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
 	int err;
-	struct if_clone *nifc;
 
 	/*
 	 * Given that the cloned ifnet might be attached to a different
