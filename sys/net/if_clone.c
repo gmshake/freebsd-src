@@ -882,7 +882,6 @@ ifc_rename_ifp(struct ifnet *ifp, char *new_name)
 	int unit = -1;
 
 	KASSERT(new_name[0] != '\0', ("Invalid interface name"));
-	IF_ADDR_WLOCK_ASSERT(ifp);
 
 	/* XXX lock cloners ??? */
 	oifc = ifc_find_cloner_in_vnet(ifp->if_dname, ifp->if_home_vnet);
@@ -891,12 +890,12 @@ ifc_rename_ifp(struct ifnet *ifp, char *new_name)
 
 	ifc_name2unit(new_name, &unit);
 
-	if (unit >= 0) {
+	if (unit >= 0 && (oifc->ifc_flags & IFC_F_AUTOUNIT)) {
 		CURVNET_SET_QUIET(ifp->if_vnet);
 		ifc = ifc_find_cloner_match(new_name);
 		CURVNET_RESTORE();
 
-		if (ifc == oifc && (ifc->ifc_flags & IFC_F_AUTOUNIT)) {
+		if (ifc == oifc) {
 			if (unit > ifc->ifc_maxunit)
 				return (ENOSPC);
 
