@@ -909,7 +909,7 @@ ifc_rename_ifp(struct ifnet *ifp, char *new_name)
 	}
 
 	if (oifc->ifc_flags & IFC_F_AUTOUNIT && ifp->if_dunit != IF_DUNIT_NONE) {
-		free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+		free_unr(oifc->ifc_unrhdr, ifp->if_dunit);
 		ifp->if_dunit = IF_DUNIT_NONE;
 	}
 
