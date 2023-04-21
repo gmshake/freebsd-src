@@ -893,7 +893,7 @@ ifc_reassign_unit(struct ifnet *ifp, char *new_name)
 	if (ifc == NULL || (ifc->ifc_flags & IFC_F_AUTOUNIT) == 0)
 		return (0);
 
-	CURVNET_SET_QUIET(ifp->if_vnet);
+	CURVNET_SET_QUIET(ifp->if_home_vnet);
 	nifc = ifc_find_cloner_match(new_name);
 	CURVNET_RESTORE();
 	if (nifc == ifc) {
