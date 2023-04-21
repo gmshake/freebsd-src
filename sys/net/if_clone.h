@@ -120,7 +120,7 @@ int	if_clone_destroy(const char *);
 int	if_clone_list(struct if_clonereq *);
 void	if_clone_restoregroup(struct ifnet *);
 int	ifc_reassign_unit(struct ifnet *, char *);
-void	ifc_reassign_unit_vnet(struct ifnet *, struct vnet *)
+void	ifc_reassign_unit_vnet(struct ifnet *, struct vnet *);
 
 /* The below interfaces are used only by epair(4). */
 void	if_clone_addif(struct if_clone *, struct ifnet *);
