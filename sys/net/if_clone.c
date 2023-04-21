@@ -875,43 +875,85 @@ ifc_flags_get(struct if_clone *ifc)
 	return (ifc->ifc_flags);
 }
 
+/*
+ * Reassign unit number from new name.
+ */
 int
-ifc_rename_ifp(struct ifnet *ifp, char *new_name)
+ifc_reassign_unit(struct ifnet *ifp, char *new_name)
 {
-	struct if_clone *ifc, *oifc;
-	int unit = -1;
+	struct if_clone *ifc, *nifc;
 
 	KASSERT(new_name[0] != '\0', ("Invalid interface name"));
 
+	if (ifp->if_vnet != ifp->if_home_vnet)
+		return (0);
 	/* XXX lock cloners ??? */
-	oifc = ifc_find_cloner_in_vnet(ifp->if_dname, ifp->if_home_vnet);
-	if (oifc == NULL)
-		return (EINVAL);
+	ifc = ifc_find_cloner_in_vnet(ifp->if_dname, ifp->if_home_vnet);
+	/* Physical interfaces do not have cloner */
+	if (ifc == NULL || (ifc->ifc_flags & IFC_F_AUTOUNIT) == 0)
+		return (0);
 
-	ifc_name2unit(new_name, &unit);
-
-	if (unit >= 0 && (oifc->ifc_flags & IFC_F_AUTOUNIT)) {
-		CURVNET_SET_QUIET(ifp->if_vnet);
-		ifc = ifc_find_cloner_match(new_name);
-		CURVNET_RESTORE();
-
-		if (ifc == oifc) {
+	CURVNET_SET_QUIET(ifp->if_vnet);
+	nifc = ifc_find_cloner_match(new_name);
+	CURVNET_RESTORE();
+	if (nifc == ifc) {
+		int unit = -1;
+		ifc_name2unit(new_name, &unit);
+		if (unit >= 0) {
 			if (unit > ifc->ifc_maxunit)
 				return (ENOSPC);
-
 			if (alloc_unr_specific(ifc->ifc_unrhdr, unit) == -1)
 				return (EEXIST);
-
-			free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+			if (ifp->if_dunit != IF_DUNIT_NONE)
+				free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+			/* FIXME need lock ??? */
 			ifp->if_dunit = unit;
 			return (0);
 		}
 	}
-
-	if (oifc->ifc_flags & IFC_F_AUTOUNIT && ifp->if_dunit != IF_DUNIT_NONE) {
-		free_unr(oifc->ifc_unrhdr, ifp->if_dunit);
+	if (ifp->if_dunit != IF_DUNIT_NONE) {
+		free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+		/* FIXME need lock ??? */
 		ifp->if_dunit = IF_DUNIT_NONE;
 	}
-
 	return (0);
+}
+
+void
+ifc_reassign_unit_vnet(struct ifnet *ifp, struct vnet *new_vnet)
+{
+	struct if_clone *ifc;
+	KASSERT(ifp->if_vnet != new_vnet, ("Require different vnet"));
+
+	ifc = ifc_find_cloner_in_vnet(ifp->if_dname, ifp->if_home_vnet);
+	if (ifc == NULL || (ifc->ifc_flags & IFC_F_AUTOUNIT) == 0)
+		return;
+
+	if (new_vnet != ifp->if_home_vnet) {
+		if (ifp->if_vnet == ifp->if_home_vnet &&
+		    ifp->if_dunit != IF_DUNIT_NONE) {
+			free_unr(ifc->ifc_unrhdr, ifp->if_dunit);
+			/* FIXME need lock ??? */
+			ifp->if_dunit = IF_DUNIT_NONE;
+		}
+	} else {
+		KASSERT(ifp->if_dunit == IF_DUNIT_NONE, ("Unit number is not released"));
+
+		struct if_clone *nifc;
+		CURVNET_SET_QUIET(ifp->if_home_vnet);
+		nifc = ifc_find_cloner_match(ifp->if_xname);
+		CURVNET_RESTORE();
+		if (nifc != ifc)
+			return;
+
+		int unit = -1;
+		ifc_name2unit(ifp->if_xname, &unit);
+		if (unit < 0 || unit > ifc->ifc_maxunit)
+			return;
+		if (alloc_unr_specific(ifc->ifc_unrhdr, unit) == -1)
+			return;
+
+		/* FIXME need lock ??? */
+		ifp->if_dunit = unit;
+	}
 }

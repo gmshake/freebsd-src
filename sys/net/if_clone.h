@@ -119,8 +119,8 @@ int	if_clone_create(char *, size_t, caddr_t);
 int	if_clone_destroy(const char *);
 int	if_clone_list(struct if_clonereq *);
 void	if_clone_restoregroup(struct ifnet *);
-/* TODO better name */
-int	ifc_rename_ifp(struct ifnet *, char *);
+int	ifc_reassign_unit(struct ifnet *, char *);
+void	ifc_reassign_unit_vnet(struct ifnet *, struct vnet *)
 
 /* The below interfaces are used only by epair(4). */
 void	if_clone_addif(struct if_clone *, struct ifnet *);

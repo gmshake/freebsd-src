@@ -1290,6 +1290,11 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 		return (rc);
 
 	/*
+	 * Release old unit number or accquire a new one.
+	 */
+	ifc_reassign_unit_vnet(ifp, new_vnet);
+
+	/*
 	 * Perform interface-specific reassignment tasks, if provided by
 	 * the driver.
 	 */
@@ -2771,7 +2776,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 		if_printf(ifp, "changing name to '%s'\n", new_name);
 
-		if ((error = ifc_rename_ifp(ifp, new_name)) != 0) {
+		if ((error = ifc_reassign_unit(ifp, new_name)) != 0) {
 			EVENTHANDLER_INVOKE(ifnet_arrival_event, ifp);
 
 			ifp->if_flags &= ~IFF_RENAMING;
