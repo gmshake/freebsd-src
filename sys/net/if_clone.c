@@ -520,6 +520,10 @@ ifc_simple_create_wrapper(struct if_clone *ifc, char *name, size_t maxlen,
 static int
 ifc_simple_destroy_wrapper(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
+	if (ifp->if_dunit != IF_DUNIT_NONE &&
+	    ifp->if_dunit < ifc->ifcs_minifs &&
+	    (flags & IFC_F_FORCE) == 0)
+		return (EINVAL);
 
 	ifc->ifcs_destroy(ifp);
 	return (0);
