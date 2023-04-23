@@ -712,7 +712,8 @@ parse_dpcpu(elf_file_t ef)
 static int
 parse_vnet(elf_file_t ef)
 {
-	int error, size;
+	int error;
+	size_t size;
 #if defined(__i386__)
 	uint32_t pad;
 #endif
@@ -1711,6 +1712,8 @@ link_elf_lookup_set(linker_file_t lf, const char *name,
 	}
 	stop = (void **)symval.value;
 
+	/* FIXME is it possible that stop < start ??? */
+	KASSERT(stop >= start);
 	/* and the number of entries */
 	count = stop - start;
 

@@ -199,7 +199,7 @@ struct sx		vnet_sysinit_sxlock;
 
 struct vnet_data_free {
 	uintptr_t	vnd_start;
-	int		vnd_len;
+	size_t		vnd_len;
 	TAILQ_ENTRY(vnet_data_free) vnd_link;
 };
 
@@ -377,7 +377,7 @@ VNET_SYSINIT(vnet_sysinit_done, SI_SUB_VNET_DONE, SI_ORDER_ANY,
  * should be used only by the kernel linker.
  */
 void *
-vnet_data_alloc(int size)
+vnet_data_alloc(size_t size)
 {
 	struct vnet_data_free *df;
 	void *s;
@@ -408,7 +408,7 @@ vnet_data_alloc(int size)
  * Free space for a virtualized global variable on module unload.
  */
 void
-vnet_data_free(void *start_arg, int size)
+vnet_data_free(void *start_arg, size_t size)
 {
 	struct vnet_data_free *df;
 	struct vnet_data_free *dn;
@@ -464,7 +464,7 @@ vnet_data_free(void *start_arg, int size)
  * initial value to each already-allocated virtual network stack instance.
  */
 void
-vnet_data_copy(void *start, int size)
+vnet_data_copy(void *start, size_t size)
 {
 	struct vnet *vnet;
 

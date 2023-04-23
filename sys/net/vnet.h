@@ -309,9 +309,9 @@ extern struct sx vnet_sxlock;
 /*
  * Virtual network stack allocator interfaces from the kernel linker.
  */
-void	*vnet_data_alloc(int size);
-void	 vnet_data_copy(void *start, int size);
-void	 vnet_data_free(void *start_arg, int size);
+void	*vnet_data_alloc(size_t size);
+void	 vnet_data_copy(void *start, size_t size);
+void	 vnet_data_free(void *start_arg, size_t size);
 
 /*
  * Virtual sysinit mechanism, allowing network stack components to declare
