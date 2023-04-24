@@ -696,7 +696,7 @@ parse_dpcpu(elf_file_t ef)
 	ef->pcpu_base = (Elf_Addr)(uintptr_t)dpcpu_alloc(size);
 	if (ef->pcpu_base == 0) {
 		printf("%s: pcpu module space is out of space; "
-		    "cannot allocate %zu for %s\n",
+		    "cannot allocate %d for %s\n",
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}
@@ -725,6 +725,9 @@ parse_vnet(elf_file_t ef)
 	/* Error just means there is no vnet data set to relocate. */
 	if (error != 0)
 		return (0);
+	/* TODO kernel error message */
+	if (ef->vnet_stop < ef->vnet_start)
+		return (ENOEXEC);
 	size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
 	/* Empty set? */
 	if (size < 1)
@@ -757,7 +760,7 @@ parse_vnet(elf_file_t ef)
 	ef->vnet_base = (Elf_Addr)(uintptr_t)vnet_data_alloc(size);
 	if (ef->vnet_base == 0) {
 		printf("%s: vnet module space is out of space; "
-		    "cannot allocate %d for %s\n",
+		    "cannot allocate %zu for %s\n",
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}
@@ -1712,8 +1715,6 @@ link_elf_lookup_set(linker_file_t lf, const char *name,
 	}
 	stop = (void **)symval.value;
 
-	/* FIXME is it possible that stop < start, panic or return error ??? */
-	KASSERT(stop >= start, ("link_elf_lookup_set: Invalid linker file"));
 	/* and the number of entries */
 	count = stop - start;
 
