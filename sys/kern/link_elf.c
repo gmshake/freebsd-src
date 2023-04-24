@@ -725,9 +725,12 @@ parse_vnet(elf_file_t ef)
 	/* Error just means there is no vnet data set to relocate. */
 	if (error != 0)
 		return (0);
-	/* TODO kernel error message */
-	if (ef->vnet_stop < ef->vnet_start)
+	/* FIXME Can this happen ??? */
+	if (ef->vnet_stop < ef->vnet_start) {
+		uprintf("Kernel module '%s' must be recompiled with linker script\n",
+		    ef->lf.pathname);
 		return (ENOEXEC);
+	}
 	size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
 	/* Empty set? */
 	if (size < 1)
