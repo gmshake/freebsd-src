@@ -652,7 +652,8 @@ parse_dynamic(elf_file_t ef)
 static int
 parse_dpcpu(elf_file_t ef)
 {
-	int error, size;
+	int error;
+	size_t size;
 #if defined(__i386__)
 	uint32_t pad;
 #endif
@@ -664,6 +665,11 @@ parse_dpcpu(elf_file_t ef)
 	/* Error just means there is no pcpu set to relocate. */
 	if (error != 0)
 		return (0);
+	if (ef->pcpu_stop < ef->pcpu_start) {
+		uprintf("Kernel module '%s' must be recompiled with linker script\n",
+		    ef->lf.pathname);
+		return (ENOEXEC);
+	}
 	size = (uintptr_t)ef->pcpu_stop - (uintptr_t)ef->pcpu_start;
 	/* Empty set? */
 	if (size < 1)
@@ -696,7 +702,7 @@ parse_dpcpu(elf_file_t ef)
 	ef->pcpu_base = (Elf_Addr)(uintptr_t)dpcpu_alloc(size);
 	if (ef->pcpu_base == 0) {
 		printf("%s: pcpu module space is out of space; "
-		    "cannot allocate %d for %s\n",
+		    "cannot allocate %zu for %s\n",
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}

@@ -68,7 +68,7 @@ static MALLOC_DEFINE(M_PCPU, "Per-cpu", "Per-cpu resource accouting.");
 
 struct dpcpu_free {
 	uintptr_t	df_start;
-	int		df_len;
+	size_t		df_len;
 	TAILQ_ENTRY(dpcpu_free) df_link;
 };
 
@@ -162,7 +162,7 @@ SYSINIT(pcpu_zones, SI_SUB_COUNTER, SI_ORDER_FIRST, pcpu_zones_startup, NULL);
  * kernel linkers to place module linker sets.
  */
 void *
-dpcpu_alloc(int size)
+dpcpu_alloc(size_t size)
 {
 	struct dpcpu_free *df;
 	void *s;
@@ -193,7 +193,7 @@ dpcpu_alloc(int size)
  * Free dynamic per-cpu space at module unload time. 
  */
 void
-dpcpu_free(void *s, int size)
+dpcpu_free(void *s, size_t size)
 {
 	struct dpcpu_free *df;
 	struct dpcpu_free *dn;
@@ -247,7 +247,7 @@ dpcpu_free(void *s, int size)
  * Initialize the per-cpu storage from an updated linker-set region.
  */
 void
-dpcpu_copy(void *s, int size)
+dpcpu_copy(void *s, size_t size)
 {
 #ifdef SMP
 	uintptr_t dpcpu;

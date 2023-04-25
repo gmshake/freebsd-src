@@ -318,9 +318,9 @@ extern struct pcpu *cpuid_to_pcpu[];
 void	cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 void	db_show_mdpcpu(struct pcpu *pcpu);
 
-void	*dpcpu_alloc(int size);
-void	dpcpu_copy(void *s, int size);
-void	dpcpu_free(void *s, int size);
+void	*dpcpu_alloc(size_t size);
+void	dpcpu_copy(void *s, size_t size);
+void	dpcpu_free(void *s, size_t size);
 void	dpcpu_init(void *dpcpu, int cpuid);
 void	pcpu_destroy(struct pcpu *pcpu);
 struct	pcpu *pcpu_find(u_int cpuid);
