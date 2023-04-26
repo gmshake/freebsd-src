@@ -1881,9 +1881,11 @@ link_elf_propagate_vnets(linker_file_t lf)
 				continue;
 			if (ef->progtab[i].name == NULL)
 				continue;
-			if (strcmp(ef->progtab[i].name, VNET_SETNAME) == 0)
+			if (strcmp(ef->progtab[i].name, VNET_SETNAME) == 0) {
 				vnet_data_copy(ef->progtab[i].addr,
 				    ef->progtab[i].size);
+				break;
+			}
 		}
 	}
 }
