@@ -382,6 +382,8 @@ vnet_data_alloc(int size)
 	struct vnet_data_free *df;
 	void *s;
 
+	printf("%s: size %d\n", __func__, size);
+
 	s = NULL;
 	size = roundup2(size, sizeof(void *));
 	sx_xlock(&vnet_data_free_lock);
@@ -414,6 +416,8 @@ vnet_data_free(void *start_arg, int size)
 	struct vnet_data_free *dn;
 	uintptr_t start;
 	uintptr_t end;
+
+	printf("%s: start: %p, size: %d\n", __func__, start_arg, size);
 
 	size = roundup2(size, sizeof(void *));
 	start = (uintptr_t)start_arg;
@@ -467,6 +471,8 @@ void
 vnet_data_copy(void *start, int size)
 {
 	struct vnet *vnet;
+
+	printf("%s: start: %p, size: %d\n", __func__, start, size);
 
 	VNET_LIST_RLOCK();
 	LIST_FOREACH(vnet, &vnet_head, vnet_le)

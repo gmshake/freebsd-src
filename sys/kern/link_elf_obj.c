@@ -352,6 +352,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	Elf_Addr off;
 	int error, i, j, pb, ra, rl, shstrindex, symstrindex, symtabindex;
 
+	printf("%s(%s): preload file '%s'\n", __func__, cls->name, filename);
+
 	/* Look to see if we have the file preloaded */
 	modptr = preload_search_by_name(filename);
 	if (modptr == NULL)
@@ -364,6 +366,9 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	    MODINFOMD_ELFHDR);
 	shdr = (Elf_Shdr *)preload_search_info(modptr, MODINFO_METADATA |
 	    MODINFOMD_SHDR);
+
+	printf("%s(%s): file type '%s'\n", __func__, cls->name, type);
+
 	if (type == NULL || (strcmp(type, "elf" __XSTRING(__ELF_WORD_SIZE)
 	    " obj module") != 0 &&
 	    strcmp(type, "elf obj module") != 0)) {
@@ -548,6 +553,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 				}
 				memcpy(vnet_data, ef->progtab[pb].addr,
 				    ef->progtab[pb].size);
+				printf("%s(elf_obj): vnet_data_copy\n", __func__);
 				vnet_data_copy(vnet_data, shdr[i].sh_size);
 				ef->progtab[pb].addr = vnet_data;
 #endif
@@ -662,6 +668,8 @@ link_elf_link_preload_finish(linker_file_t lf)
 	elf_file_t ef;
 	int error;
 
+	printf("%s(elf_obj): preload file '%s' finish\n", __func__, lf->pathname);
+
 	ef = (elf_file_t)lf;
 	error = relocate_file(ef);
 	if (error)
@@ -715,6 +723,8 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	mapsize = 0;
 	hdr = NULL;
 
+	printf("%s(%s): load file '%s'\n", __func__, cls->name, filename);
+
 	nd = malloc(sizeof(struct nameidata), M_TEMP, M_WAITOK);
 	NDINIT(nd, LOOKUP, FOLLOW, UIO_SYSSPACE, filename);
 	flags = FREAD;
@@ -764,7 +774,9 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		error = ENOEXEC;
 		goto out;
 	}
+	printf("%s(%s): elf header e_type: %d\n", __func__, cls->name, hdr->e_type);
 	if (hdr->e_type != ET_REL) {
+		printf("%s(%s): unsupported e_type: %d\n", __func__, cls->name, hdr->e_type);
 		error = ENOSYS;
 		goto out;
 	}
@@ -1123,9 +1135,11 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 #ifdef VIMAGE
 				else if (ef->progtab[pb].addr !=
 				    (void *)mapbase &&
-				    !strcmp(ef->progtab[pb].name, VNET_SETNAME))
+				    !strcmp(ef->progtab[pb].name, VNET_SETNAME)) {
+					printf("%s(elf_obj): vnet_data_copy\n", __func__);
 					vnet_data_copy(ef->progtab[pb].addr,
 					    shdr[i].sh_size);
+				}
 #endif
 			} else
 				bzero(ef->progtab[pb].addr, shdr[i].sh_size);
@@ -1257,6 +1271,8 @@ link_elf_unload_file(linker_file_t file)
 {
 	elf_file_t ef = (elf_file_t) file;
 	u_int i;
+
+	printf("%s(elf_obj): unload file '%s'\n", __func__, file->pathname);
 
 	link_elf_invoke_cbs(file->dtors_addr, file->dtors_size);
 
@@ -1873,6 +1889,8 @@ static void
 link_elf_propagate_vnets(linker_file_t lf)
 {
 	elf_file_t ef = (elf_file_t) lf;
+
+	printf("%s(elf_obj): propagate vnets for '%s'\n", __func__, lf->pathname);
 
 	/* Propagate system tunable values to all vnet */
 	if (ef->progtab) {

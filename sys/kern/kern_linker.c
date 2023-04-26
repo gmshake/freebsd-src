@@ -456,9 +456,11 @@ linker_load_file(const char *filename, linker_file_t *result)
 	 * and there is no class deregistration mechanism at this time.
 	 */
 	TAILQ_FOREACH(lc, &classes, link) {
-		KLD_DPF(FILE, ("linker_load_file: trying to load %s\n",
-		    filename));
+		KLD_DPF(FILE, ("linker_load_file(%s): trying to load %s\n",
+		    lc->name, filename));
 		error = LINKER_LOAD_FILE(lc, filename, &lf);
+		KLD_DPF(FILE, ("linker_load_file(%s): load %s, error=%d\n",
+			lc->name, filename, error));
 		/*
 		 * If we got something other than ENOENT, then it exists but
 		 * we cannot load it for some other reason.
@@ -466,6 +468,8 @@ linker_load_file(const char *filename, linker_file_t *result)
 		if (error != ENOENT)
 			foundfile = 1;
 		if (lf) {
+			KLD_DPF(FILE, ("linker_load_file(%s): trying register modules for %s\n",
+				lc->name, filename));
 			error = linker_file_register_modules(lf);
 			if (error == EEXIST) {
 				linker_file_unload(lf, LINKER_UNLOAD_FORCE);
@@ -474,6 +478,8 @@ linker_load_file(const char *filename, linker_file_t *result)
 			modules = !TAILQ_EMPTY(&lf->modules);
 			linker_file_register_sysctls(lf, false);
 #ifdef VIMAGE
+			KLD_DPF(FILE, ("linker_load_file(%s): trying propagate vnets for %s\n",
+			    lc->name, filename));
 			LINKER_PROPAGATE_VNETS(lf);
 #endif
 			linker_file_sysinit(lf);
@@ -625,7 +631,8 @@ linker_make_file(const char *pathname, linker_class_t lc)
 		sx_assert(&kld_sx, SA_XLOCKED);
 	filename = linker_basename(pathname);
 
-	KLD_DPF(FILE, ("linker_make_file: new file, filename='%s' for pathname='%s'\n", filename, pathname));
+	KLD_DPF(FILE, ("linker_make_file(%s): new file, filename='%s' for pathname='%s'\n",
+	    lc->name, filename, pathname));
 	lf = (linker_file_t)kobj_create((kobj_class_t)lc, M_LINKER, M_WAITOK);
 	if (lf == NULL)
 		return (NULL);
@@ -1613,7 +1620,11 @@ linker_preload(void *arg)
 			    modptr);
 		lf = NULL;
 		TAILQ_FOREACH(lc, &classes, link) {
+			KLD_DPF(FILE, ("linker_preload(%s): trying preload %s\n",
+				lc->name, modname));
 			error = LINKER_LINK_PRELOAD(lc, modname, &lf);
+			KLD_DPF(FILE, ("linker_preload(%s): preload %s, error: %d\n",
+				lc->name, modname, error));
 			if (!error)
 				break;
 			lf = NULL;

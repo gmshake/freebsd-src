@@ -723,6 +723,8 @@ parse_vnet(elf_file_t ef)
 	uint32_t pad;
 #endif
 
+	printf("%s(elf): parse vnet for %s\n", __func__, ef->lf.pathname);
+
 	ef->vnet_start = 0;
 	ef->vnet_stop = 0;
 	error = link_elf_lookup_set(&ef->lf, "vnet", (void ***)&ef->vnet_start,
@@ -766,6 +768,11 @@ parse_vnet(elf_file_t ef)
 		    __func__, size, ef->lf.pathname);
 		return (ENOSPC);
 	}
+	char fmt[64];
+	int len = strlen("vnet_start: %p, value: %") + 16;
+	snprintf(fmt, len, "%s%dD\n", "vnet_start: %p, value: %", size);
+	printf(fmt, (void *)ef->vnet_start, (void *)ef->vnet_start, "");
+
 	memcpy((void *)ef->vnet_base, (void *)ef->vnet_start, size);
 	vnet_data_copy((void *)ef->vnet_base, size);
 	elf_set_add(&set_vnet_list, ef->vnet_start, ef->vnet_stop,
@@ -870,6 +877,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	int error;
 	vm_offset_t dp;
 
+	printf("%s(%s): preload file '%s'\n", __func__, cls->name, filename);
+
 	/* Look to see if we have the file preloaded */
 	modptr = preload_search_by_name(filename);
 	if (modptr == NULL)
@@ -880,6 +889,9 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	sizeptr = preload_search_info(modptr, MODINFO_SIZE);
 	dynptr = preload_search_info(modptr,
 	    MODINFO_METADATA | MODINFOMD_DYNAMIC);
+
+	printf("%s(%s): file type '%s'\n", __func__, cls->name, type);
+
 	if (type == NULL ||
 	    (strcmp(type, "elf" __XSTRING(__ELF_WORD_SIZE) " module") != 0 &&
 	     strcmp(type, "elf module") != 0))
@@ -920,6 +932,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	if (error == 0)
 		error = parse_dpcpu(ef);
 #ifdef VIMAGE
+	printf("%s(%s): parse vnet\n", __func__, cls->name);
 	if (error == 0)
 		error = parse_vnet(ef);
 #endif
@@ -939,6 +952,8 @@ link_elf_link_preload_finish(linker_file_t lf)
 {
 	elf_file_t ef;
 	int error;
+
+	printf("%s(elf): preload file '%s' finish\n", __func__, lf->pathname);
 
 	ef = (elf_file_t) lf;
 	error = relocate_file(ef);
@@ -985,6 +1000,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	shdr = NULL;
 	lf = NULL;
 	shstrs = NULL;
+
+	printf("%s(%s): load file '%s'\n", __func__, cls->name, filename);
 
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, filename);
 	flags = FREAD;
@@ -1034,7 +1051,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		error = ENOEXEC;
 		goto out;
 	}
+	printf("%s(%s): elf header e_type: %d\n", __func__, cls->name, hdr->e_type);
 	if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN) {
+		printf("%s(%s): unsupported e_type: %d\n", __func__, cls->name, hdr->e_type);
 		error = ENOSYS;
 		goto out;
 	}
@@ -1195,6 +1214,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	if (error != 0)
 		goto out;
 #ifdef VIMAGE
+	printf("%s(%s): parse vnet for %s\n", __func__, cls->name, filename);
 	error = parse_vnet(ef);
 	if (error != 0)
 		goto out;
@@ -1352,12 +1372,15 @@ link_elf_unload_file(linker_file_t file)
 {
 	elf_file_t ef = (elf_file_t) file;
 
+	printf("%s(elf): unload file '%s'\n", __func__, file->pathname);
+
 	if (ef->pcpu_base != 0) {
 		dpcpu_free((void *)ef->pcpu_base,
 		    ef->pcpu_stop - ef->pcpu_start);
 		elf_set_delete(&set_pcpu_list, ef->pcpu_start);
 	}
 #ifdef VIMAGE
+	printf("%s(elf): vnet_data_free '%s'\n", __func__, file->pathname);
 	if (ef->vnet_base != 0) {
 		vnet_data_free((void *)ef->vnet_base,
 		    ef->vnet_stop - ef->vnet_start);
@@ -1933,6 +1956,8 @@ link_elf_propagate_vnets(linker_file_t lf)
 	elf_file_t ef = (elf_file_t)lf;
 	int size;
 
+	printf("%s(elf): propagate vnets for '%s'\n", __func__, lf->pathname);
+
 	size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
 	/* Empty set? */
 	if (size < 1)
@@ -1942,6 +1967,14 @@ link_elf_propagate_vnets(linker_file_t lf)
 	if (size == 4)
 		return;
 #endif
+	char fmt[64];
+	int len = strlen("vnet_start: %p, value: %") + 16;
+	snprintf(fmt, len, "%s%dD\n", "vnet_base: %p, value: %", size);
+	printf(fmt, (void *)ef->vnet_base, (void *)ef->vnet_base, "");
+
+	snprintf(fmt, len, "%s%dD\n", "vnet_start: %p, value: %", size);
+	printf(fmt, (void *)ef->vnet_start, (void *)ef->vnet_start, "");
+
 	vnet_data_copy((void *)ef->vnet_base, size);
 }
 #endif
