@@ -403,6 +403,7 @@ vnet_data_alloc(int size)
 	}
 	sx_xunlock(&vnet_data_free_lock);
 
+	printf("%s: allocated with %p\n", __func__, s);
 	return (s);
 }
 
@@ -471,14 +472,18 @@ void
 vnet_data_copy(void *start, int size)
 {
 	struct vnet *vnet;
+	int i = 0;
 
 	printf("%s: start: %p, size: %d\n", __func__, start, size);
 
 	VNET_LIST_RLOCK();
-	LIST_FOREACH(vnet, &vnet_head, vnet_le)
-		memcpy((void *)((uintptr_t)vnet->vnet_data_base +
-		    (uintptr_t)start), start, size);
+	LIST_FOREACH(vnet, &vnet_head, vnet_le) {
+		memcpy((void *) ((uintptr_t) vnet->vnet_data_base +
+		                 (uintptr_t) start), start, size);
+		i++;
+	}
 	VNET_LIST_RUNLOCK();
+	printf("%s: copied %d vnet(s)\n", __func__, i);
 }
 
 /*
