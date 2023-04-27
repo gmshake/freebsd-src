@@ -1942,7 +1942,6 @@ link_elf_propagate_vnets(linker_file_t lf)
 	if (size == 4)
 		return;
 #endif
-	memcpy((void *)ef->vnet_base, (void *)ef->vnet_start, size);
 	vnet_data_copy((void *)ef->vnet_base, size);
 }
 #endif
