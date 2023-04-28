@@ -1711,6 +1711,10 @@ link_elf_lookup_set(linker_file_t lf, const char *name,
 	}
 	stop = (void **)symval.value;
 
+	if (stop < start) {
+		error = ESRCH;
+		goto out;
+	}
 	/* and the number of entries */
 	count = stop - start;
 

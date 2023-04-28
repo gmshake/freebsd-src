@@ -1566,6 +1566,8 @@ link_elf_lookup_set(linker_file_t lf, const char *name,
 			start  = (void **)ef->progtab[i].addr;
 			stop = (void **)((char *)ef->progtab[i].addr +
 			    ef->progtab[i].size);
+			if (stop < start)
+				return (ESRCH);
 			count = stop - start;
 			if (startp)
 				*startp = start;
@@ -1756,6 +1758,8 @@ link_elf_fix_link_set(elf_file_t ef)
 			}
 		}
 		if (i == ef->nprogtab)
+			continue;
+		if (stopp < startp)
 			continue;
 
 		sym->st_value = start ? startp : stopp;
