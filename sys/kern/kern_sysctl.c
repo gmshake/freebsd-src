@@ -54,6 +54,7 @@
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/jail.h>
+#include <sys/linker.h>
 #include <sys/kdb.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -127,6 +128,7 @@ static int	sysctl_remove_oid_locked(struct sysctl_oid *oidp, int del,
 		    int recurse);
 static int	sysctl_old_kernel(struct sysctl_req *, const void *, size_t);
 static int	sysctl_new_kernel(struct sysctl_req *, void *, size_t);
+static int	name2oid(char *, int *, int *, struct sysctl_oid **);
 
 static struct sysctl_oid *
 sysctl_find_oidname(const char *name, struct sysctl_oid_list *list)
@@ -512,8 +514,12 @@ sysctl_register_oid(struct sysctl_oid *oidp)
 	if ((oidp->oid_kind & CTLTYPE) != CTLTYPE_NODE &&
 	    (oidp->oid_kind & CTLFLAG_TUN) != 0 &&
 	    (oidp->oid_kind & CTLFLAG_NOFETCH) == 0) {
-		/* only fetch value once */
-		oidp->oid_kind |= CTLFLAG_NOFETCH;
+#ifdef VIMAGE
+		/* can fetch multiple times for VNET loader tunable */
+		if ((oidp->oid_kind & CTLFLAG_VNET) == 0)
+#endif
+			/* only fetch value once */
+			oidp->oid_kind |= CTLFLAG_NOFETCH;
 		/* try to fetch value from kernel environment */
 		sysctl_load_tunable_by_oid_locked(oidp);
 	}
@@ -968,6 +974,129 @@ sysctl_register_all(void *arg)
 	SYSCTL_WUNLOCK();
 }
 SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
+
+#ifdef VIMAGE
+static void
+sysctl_setenv_vnet(void *arg __unused, char *name)
+{
+	struct sysctl_oid *oidp;
+	int oid[CTL_MAXNAME];
+	int error, nlen;
+
+	SYSCTL_WLOCK();
+	error = name2oid(name, oid, &nlen, &oidp);
+	if (error)
+		goto out;
+
+	if ((oidp->oid_kind & CTLTYPE) != CTLTYPE_NODE &&
+	    (oidp->oid_kind & CTLFLAG_VNET) != 0 &&
+	    (oidp->oid_kind & CTLFLAG_TUN) != 0 &&
+	    (oidp->oid_kind & CTLFLAG_NOFETCH) == 0) {
+		/* try to update value from kernel environment */
+		sysctl_load_tunable_by_oid_locked(oidp);
+	}
+
+out:
+	SYSCTL_WUNLOCK();
+}
+
+struct cbargs {
+	struct sysctl_oid	*oidp;
+	void	*addr;
+	size_t	size;
+};
+
+static int
+sysctl_linker_file_cb(linker_file_t lf, void *arg)
+{
+	struct sysctl_oid **start, **stop, **o;
+	struct cbargs *args = arg;
+
+	if (linker_file_lookup_set(lf, "sysctl_set", &start, &stop, NULL) != 0)
+		return (0);
+	for (o = start; o < stop; o++) {
+		if (*o == args->oidp) {
+			linker_file_restore_vnet_variable(lf, args->addr, args->size);
+			return (1);
+		}
+	}
+	return (0);
+}
+
+static void
+sysctl_unsetenv_vnet(void *arg __unused, char *name)
+{
+	struct rm_priotracker tracker;
+	struct sysctl_oid *oidp;
+	int oid[CTL_MAXNAME];
+	int error, nlen;
+
+	SYSCTL_RLOCK(&tracker);
+	error = name2oid(name, oid, &nlen, &oidp);
+	if (error)
+		goto out;
+
+	if ((oidp->oid_kind & CTLTYPE) != CTLTYPE_NODE &&
+	    (oidp->oid_kind & CTLFLAG_VNET) != 0 &&
+	    (oidp->oid_kind & CTLFLAG_TUN) != 0 &&
+	    (oidp->oid_kind & CTLFLAG_NOFETCH) == 0) {
+		void *addr;
+		size_t size;
+
+		switch (oidp->oid_kind & CTLTYPE) {
+		case CTLTYPE_INT:
+		case CTLTYPE_UINT:
+			size = sizeof(int);
+			break;
+		case CTLTYPE_LONG:
+		case CTLTYPE_ULONG:
+			size = sizeof(long);
+			break;
+		case CTLTYPE_S8:
+		case CTLTYPE_U8:
+			size = sizeof(int8_t);
+			break;
+		case CTLTYPE_S16:
+		case CTLTYPE_U16:
+			size = sizeof(int16_t);
+			break;
+		case CTLTYPE_S32:
+		case CTLTYPE_U32:
+			size = sizeof(int32_t);
+			break;
+		case CTLTYPE_S64:
+		case CTLTYPE_U64:
+			size = sizeof(int64_t);
+			break;
+		case CTLTYPE_STRING:
+			MPASS(oidp->oid_arg2 > 0);
+			size = oidp->oid_arg2;
+			break;
+		default:
+			// not supported
+			goto out;
+		}
+		addr = oidp->oid_arg1;
+		SYSCTL_RUNLOCK(&tracker);
+
+		struct cbargs args = {
+			.oidp = oidp,
+			.addr = addr,
+			.size = size
+		};
+		linker_file_foreach(sysctl_linker_file_cb, &args);
+		return;
+	}
+out:
+	SYSCTL_RUNLOCK(&tracker);
+}
+
+/*
+ * Register the kernel's setenv / unsetenv events.
+ */
+EVENTHANDLER_DEFINE(setenv, sysctl_setenv_vnet, NULL, EVENTHANDLER_PRI_ANY);
+EVENTHANDLER_DEFINE(unsetenv, sysctl_unsetenv_vnet, NULL, EVENTHANDLER_PRI_ANY);
+#endif
 
 /*
  * "Staff-functions"

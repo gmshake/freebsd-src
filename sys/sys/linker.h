@@ -205,6 +205,10 @@ void *linker_hwpmc_list_objects(void);
 int linker_kldload_busy(int flags);
 void linker_kldload_unbusy(int flags);
 
+#ifdef VIMAGE
+void linker_file_restore_vnet_variable(linker_file_t lf, void *addr,
+    size_t size);
+#endif
 #endif	/* _KERNEL */
 
 /*
