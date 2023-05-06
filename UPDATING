@@ -27,6 +27,11 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 14.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20230506:
+	Enable vnet sysctl variables be loader tunable. SYSCTLs which belong to
+	VNETs can be initialized during early boot if thay are marked with CTLFLAG_TUN
+	and there are corresponding kernel environment variables.
+
 20230422:
 	Remove portsnap(8).  Users are encouraged to obtain the ports tree
 	using git instead.
