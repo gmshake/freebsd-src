@@ -163,4 +163,13 @@ METHOD int link_preload_finish {
 METHOD void propagate_vnets {
 	linker_file_t	file;
 };
+
+#
+# Restore vnets' default values
+#
+METHOD void restore_vnet_default {
+	linker_file_t	file;
+	void *		addr;
+	size_t          size;
+};
 #endif

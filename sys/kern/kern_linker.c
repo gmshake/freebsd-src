@@ -2353,3 +2353,12 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_kern_function_list, "",
     "kernel function list");
+
+#ifdef VIMAGE
+void
+linker_file_restore_vnet_variable(linker_file_t lf, void *addr, size_t size)
+{
+	sx_assert(&kld_sx, SA_LOCKED);
+	LINKER_RESTORE_VNET_DEFAULT(lf, addr, size);
+}
+#endif
