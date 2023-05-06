@@ -162,6 +162,7 @@ static long	link_elf_symtab_get(linker_file_t, const Elf_Sym **);
 static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
+static void	link_elf_restore_vnet_default(linker_file_t, void *, size_t);
 #endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
 
@@ -183,6 +184,7 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_strtab_get,		link_elf_strtab_get),
 #ifdef VIMAGE
 	KOBJMETHOD(linker_propagate_vnets,	link_elf_propagate_vnets),
+	KOBJMETHOD(linker_restore_vnet_default,	link_elf_restore_vnet_default),
 #endif
 	KOBJMETHOD_END
 };
@@ -1940,6 +1942,21 @@ link_elf_propagate_vnets(linker_file_t lf)
 		size = (uintptr_t)ef->vnet_stop - (uintptr_t)ef->vnet_start;
 		vnet_data_copy((void *)ef->vnet_base, size);
 	}
+}
+
+static void
+link_elf_restore_vnet_default(linker_file_t lf, void *addr, size_t size)
+{
+	elf_file_t ef = (elf_file_t)lf;
+
+	MPASS(size > 0);
+	MPASS(ef->vnet_base != 0);
+	MPASS((void *)ef->vnet_base <= addr &&
+	    (uintptr_t)addr + size <= (uintptr_t)ef->vnet_base + (ef->vnet_stop - ef->vnet_start));
+
+	memcpy(addr,
+	    (void *)(ef->vnet_start + ((uintptr_t)addr - (uintptr_t)ef->vnet_base)),
+	    size);
 }
 #endif
 

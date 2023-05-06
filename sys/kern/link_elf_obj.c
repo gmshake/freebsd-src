@@ -75,6 +75,9 @@ typedef struct {
 	int		flags;	/* Section flags. */
 	int		sec;	/* Original section number. */
 	char		*name;
+#ifdef VIMAGE
+	void            *oaddr; /* Original addr, for vnet */
+#endif
 } Elf_progent;
 
 typedef struct {
@@ -152,6 +155,7 @@ static long	link_elf_symtab_get(linker_file_t, const Elf_Sym **);
 static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
+static void	link_elf_restore_vnet_default(linker_file_t, void *, size_t);
 #endif
 
 static int	elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps,
@@ -175,6 +179,7 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_strtab_get, 		link_elf_strtab_get),
 #ifdef VIMAGE
 	KOBJMETHOD(linker_propagate_vnets,	link_elf_propagate_vnets),
+	KOBJMETHOD(linker_restore_vnet_default,	link_elf_restore_vnet_default),
 #endif
 	KOBJMETHOD_END
 };
@@ -546,6 +551,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 				}
 				memcpy(vnet_data, ef->progtab[pb].addr,
 				    ef->progtab[pb].size);
+				ef->progtab[pb].oaddr = ef->progtab[pb].addr;
 				ef->progtab[pb].addr = vnet_data;
 #endif
 			} else if ((ef->progtab[pb].name != NULL &&
@@ -1070,29 +1076,14 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 					    "for %s\n", __func__,
 					    (uintmax_t)shdr[i].sh_size,
 					    filename);
+					error = ENOSPC;
+					goto out;
 				}
 			}
-#ifdef VIMAGE
-			else if (ef->progtab[pb].name != NULL &&
-			    !strcmp(ef->progtab[pb].name, VNET_SETNAME)) {
-				ef->progtab[pb].addr =
-				    vnet_data_alloc(shdr[i].sh_size);
-				if (ef->progtab[pb].addr == NULL) {
-					printf("%s: vnet module space is out "
-					    "of space; cannot allocate %#jx "
-					    "for %s\n", __func__,
-					    (uintmax_t)shdr[i].sh_size,
-					    filename);
-				}
-			}
-#endif
 			else
 				ef->progtab[pb].addr =
 				    (void *)(uintptr_t)mapbase;
-			if (ef->progtab[pb].addr == NULL) {
-				error = ENOSPC;
-				goto out;
-			}
+
 			ef->progtab[pb].size = shdr[i].sh_size;
 			ef->progtab[pb].flags = shdr[i].sh_flags;
 			ef->progtab[pb].sec = i;
@@ -1120,6 +1111,29 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 			} else
 				bzero(ef->progtab[pb].addr, shdr[i].sh_size);
 
+#ifdef VIMAGE
+			/* Initialize the vnet area. */
+			if (ef->progtab[pb].name != NULL &&
+			    !strcmp(ef->progtab[pb].name, VNET_SETNAME)) {
+				void *vnet_data;
+
+				vnet_data = vnet_data_alloc(shdr[i].sh_size);
+				if (vnet_data == NULL) {
+					printf("%s: vnet module space is out "
+					    "of space; cannot allocate %#jx "
+					    "for %s\n", __func__,
+					    (uintmax_t)shdr[i].sh_size,
+					    filename);
+					error = ENOSPC;
+					goto out;
+				}
+				memcpy(vnet_data, ef->progtab[pb].addr,
+				    ef->progtab[pb].size);
+				vnet_data_copy(vnet_data, shdr[i].sh_size);
+				ef->progtab[pb].oaddr = ef->progtab[pb].addr;
+				ef->progtab[pb].addr = vnet_data;
+			}
+#endif
 			/* Update all symbol values with the offset. */
 			for (j = 0; j < ef->ddbsymcnt; j++) {
 				es = &ef->ddbsymtab[j];
@@ -1876,6 +1890,34 @@ link_elf_propagate_vnets(linker_file_t lf)
 				break;
 			}
 		}
+	}
+}
+
+static void
+link_elf_restore_vnet_default(linker_file_t lf, void *addr, size_t size)
+{
+	elf_file_t ef = (elf_file_t)lf;
+
+	MPASS(size > 0);
+	MPASS(ef->progtab != NULL);
+
+	for (int i = 0; i < ef->nprogtab; i++) {
+		if (ef->progtab[i].size == 0)
+			continue;
+		if (ef->progtab[i].name == NULL)
+			continue;
+		if (strcmp(ef->progtab[i].name, VNET_SETNAME) != 0)
+			continue;
+
+		MPASS(ef->progtab[i].oaddr != NULL);
+	        MPASS(ef->progtab[i].addr <= addr &&
+		    ((uintptr_t)addr + size) <= ((uintptr_t)ef->progtab[i].addr +
+		        ef->progtab[i].size));
+
+		memcpy(addr, (void *)((uintptr_t)ef->progtab[i].oaddr +
+		    ((uintptr_t)addr - (uintptr_t)ef->progtab[i].addr)),
+		    size);
+		break;
 	}
 }
 #endif
