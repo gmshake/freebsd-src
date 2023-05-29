@@ -143,7 +143,12 @@ struct tcp_hostcache {
 #define TCP_HOSTCACHE_EXPIRE		60*60	/* one hour */
 #define TCP_HOSTCACHE_PRUNE		5*60	/* every 5 minutes */
 
-VNET_DEFINE_STATIC(struct tcp_hostcache, tcp_hostcache);
+VNET_DEFINE_STATIC(struct tcp_hostcache, tcp_hostcache) = {
+	.hashsize = TCP_HOSTCACHE_HASHSIZE,
+	.bucketlimit = TCP_HOSTCACHE_BUCKETLIMIT,
+	.expire = TCP_HOSTCACHE_EXPIRE,
+	.prune = TCP_HOSTCACHE_PRUNE,
+};
 #define	V_tcp_hostcache		VNET(tcp_hostcache)
 
 VNET_DEFINE_STATIC(struct callout, tcp_hc_callout);
@@ -232,29 +237,18 @@ tcp_hc_init(void)
 	/*
 	 * Initialize hostcache structures.
 	 */
-	atomic_store_int(&V_tcp_hostcache.cache_count, 0);
-	V_tcp_hostcache.hashsize = TCP_HOSTCACHE_HASHSIZE;
-	V_tcp_hostcache.bucket_limit = TCP_HOSTCACHE_BUCKETLIMIT;
-	V_tcp_hostcache.expire = TCP_HOSTCACHE_EXPIRE;
-	V_tcp_hostcache.prune = TCP_HOSTCACHE_PRUNE;
 	V_tcp_hostcache.hashsalt = arc4random();
 
-	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.hashsize",
-	    &V_tcp_hostcache.hashsize);
 	if (!powerof2(V_tcp_hostcache.hashsize)) {
 		printf("WARNING: hostcache hash size is not a power of 2.\n");
 		V_tcp_hostcache.hashsize = TCP_HOSTCACHE_HASHSIZE; /* default */
 	}
 	V_tcp_hostcache.hashmask = V_tcp_hostcache.hashsize - 1;
 
-	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.bucketlimit",
-	    &V_tcp_hostcache.bucket_limit);
-
 	cache_limit = V_tcp_hostcache.hashsize * V_tcp_hostcache.bucket_limit;
-	V_tcp_hostcache.cache_limit = cache_limit;
-	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.cachelimit",
-	    &V_tcp_hostcache.cache_limit);
-	if (V_tcp_hostcache.cache_limit > cache_limit)
+	if (V_tcp_hostcache.cache_limit == 0)
+		V_tcp_hostcache.cache_limit = cache_limit;
+	else if (V_tcp_hostcache.cache_limit > cache_limit)
 		V_tcp_hostcache.cache_limit = cache_limit;
 
 	/*

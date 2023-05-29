@@ -170,7 +170,11 @@ static int	 syncookie_cmp(struct in_conninfo *inc, struct syncache_head *sch,
 #define TCP_SYNCACHE_HASHSIZE		512
 #define TCP_SYNCACHE_BUCKETLIMIT	30
 
-VNET_DEFINE_STATIC(struct tcp_syncache, tcp_syncache);
+VNET_DEFINE_STATIC(struct tcp_syncache, tcp_syncache) = {
+	.hashsize = TCP_SYNCACHE_HASHSIZE,
+	.bucket_limit = TCP_SYNCACHE_BUCKETLIMIT,
+	.rexmt_limit = SYNCACHE_MAXREXMTS,
+};
 #define	V_tcp_syncache			VNET(tcp_syncache)
 
 static SYSCTL_NODE(_net_inet_tcp, OID_AUTO, syncache,
@@ -192,8 +196,8 @@ SYSCTL_UINT(_net_inet_tcp_syncache, OID_AUTO, hashsize, CTLFLAG_VNET | CTLFLAG_R
     &VNET_NAME(tcp_syncache.hashsize), 0,
     "Size of TCP syncache hashtable");
 
-SYSCTL_BOOL(_net_inet_tcp_syncache, OID_AUTO, see_other, CTLFLAG_VNET |
-    CTLFLAG_RW, &VNET_NAME(tcp_syncache.see_other), 0,
+SYSCTL_BOOL(_net_inet_tcp_syncache, OID_AUTO, see_other, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_syncache.see_other), 0,
     "All syncache(4) entries are visible, ignoring UID/GID, jail(2) "
     "and mac(4) checks");
 
@@ -254,15 +258,8 @@ syncache_init(void)
 {
 	int i;
 
-	V_tcp_syncache.hashsize = TCP_SYNCACHE_HASHSIZE;
-	V_tcp_syncache.bucket_limit = TCP_SYNCACHE_BUCKETLIMIT;
-	V_tcp_syncache.rexmt_limit = SYNCACHE_MAXREXMTS;
 	V_tcp_syncache.hash_secret = arc4random();
 
-	TUNABLE_INT_FETCH("net.inet.tcp.syncache.hashsize",
-	    &V_tcp_syncache.hashsize);
-	TUNABLE_INT_FETCH("net.inet.tcp.syncache.bucketlimit",
-	    &V_tcp_syncache.bucket_limit);
 	if (!powerof2(V_tcp_syncache.hashsize) ||
 	    V_tcp_syncache.hashsize == 0) {
 		printf("WARNING: syncache hash size is not a power of 2.\n");
@@ -271,10 +268,10 @@ syncache_init(void)
 	V_tcp_syncache.hashmask = V_tcp_syncache.hashsize - 1;
 
 	/* Set limits. */
-	V_tcp_syncache.cache_limit =
-	    V_tcp_syncache.hashsize * V_tcp_syncache.bucket_limit;
-	TUNABLE_INT_FETCH("net.inet.tcp.syncache.cachelimit",
-	    &V_tcp_syncache.cache_limit);
+	if (V_tcp_syncache.cache_limit == 0) {
+		V_tcp_syncache.cache_limit =
+		    V_tcp_syncache.hashsize * V_tcp_syncache.bucket_limit;
+	}
 
 	/* Allocate the hash table. */
 	V_tcp_syncache.hashbase = malloc(V_tcp_syncache.hashsize *
