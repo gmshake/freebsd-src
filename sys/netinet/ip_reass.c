@@ -87,7 +87,7 @@ VNET_DEFINE_STATIC(struct ipqbucket *, ipq);
 #define	V_ipq		VNET(ipq)
 VNET_DEFINE_STATIC(uint32_t, ipq_hashseed);
 #define	V_ipq_hashseed	VNET(ipq_hashseed)
-VNET_DEFINE_STATIC(uint32_t, ipq_hashsize);
+VNET_DEFINE_STATIC(uint32_t, ipq_hashsize) = IPREASS_NHASH;
 #define	V_ipq_hashsize	VNET(ipq_hashsize)
 
 #define	IPQ_LOCK(i)	mtx_lock(&V_ipq[i].lock)
@@ -682,8 +682,6 @@ ipreass_vnet_init(void)
 {
 	int max;
 
-	V_ipq_hashsize = IPREASS_NHASH;
-	TUNABLE_INT_FETCH("net.inet.ip.reass_hashsize", &V_ipq_hashsize);
 	V_ipq = malloc(sizeof(struct ipqbucket) * V_ipq_hashsize,
 	    M_IPREASS_HASH, M_WAITOK);
 
