@@ -271,7 +271,7 @@ SYSCTL_PROC(_net_inet_tcp_fastopen, OID_AUTO, autokey,
 
 static int sysctl_net_inet_tcp_fastopen_ccache_bucket_limit(SYSCTL_HANDLER_ARGS);
 SYSCTL_PROC(_net_inet_tcp_fastopen, OID_AUTO, ccache_bucket_limit,
-    CTLFLAG_VNET | CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT,
+    CTLFLAG_VNET | CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_NEEDGIANT,
     NULL, 0, &sysctl_net_inet_tcp_fastopen_ccache_bucket_limit, "IU",
     "Max entries per bucket in client cookie cache");
 
