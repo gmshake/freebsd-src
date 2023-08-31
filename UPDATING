@@ -31,6 +31,12 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 15.x IS SLOW:
 	The WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO build options have
 	been replaced by INIT_ALL=pattern and INIT_ALL=zero respectively.
 
+20230831:
+	Enable vnet sysctl variables to be loader tunable. SYSCTLs which
+	belongs to VNETs can be initialized during early boot or module
+	loading if they are marked with CTLFLAG_TUN and there are
+	corresponding kernel environment variables.
+
 20230824:
 	FreeBSD 15.0-CURRENT.
 
