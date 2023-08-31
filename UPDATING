@@ -37,6 +37,10 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 15.x IS SLOW:
 	loading if they are marked with CTLFLAG_TUN and there are
 	corresponding kernel environment variables.
 
+	A new vnet loader tunable net.pf.default_to_drop is introduced to
+	change the default rule to drop, without re-compiling the pf(4)
+	module or kernel if the module is statically linked.
+
 20230824:
 	FreeBSD 15.0-CURRENT.
 
