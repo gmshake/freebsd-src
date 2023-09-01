@@ -1950,7 +1950,6 @@ link_elf_restore_vnet_default(linker_file_t lf, void *addr, size_t size)
 	elf_file_t ef = (elf_file_t)lf;
 
 	MPASS(size > 0);
-	MPASS(ef->vnet_base != 0);
 	MPASS((void *)ef->vnet_base <= addr &&
 	    (uintptr_t)addr + size <= (uintptr_t)ef->vnet_base + (ef->vnet_stop - ef->vnet_start));
 
