@@ -33,6 +33,10 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 15.x IS SLOW:
 	loading if they are marked with CTLFLAG_TUN and there are
 	corresponding kernel environment variables.
 
+	A new vnet loader tunable net.pf.default_to_drop is introduced to
+	change the pf(4)'s default rule to drop, without re-compiling the
+	module.
+
 20230901:
 	The WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO build options have
 	been replaced by INIT_ALL=pattern and INIT_ALL=zero respectively.
