@@ -205,7 +205,8 @@ VNET_DEFINE_STATIC(bool, default_to_drop) = true;
 VNET_DEFINE_STATIC(bool, default_to_drop);
 #endif
 #define	V_default_to_drop VNET(default_to_drop)
-SYSCTL_BOOL(_net_pf, OID_AUTO, default_to_drop, CTLFLAG_RDTUN | CTLFLAG_VNET,
+SYSCTL_BOOL(_net_pf, OID_AUTO, default_to_drop,
+    CTLFLAG_VNET | CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &VNET_NAME(default_to_drop), false,
     "Make the default rule drop all packets.");
 
@@ -345,6 +346,7 @@ pfattach_vnet(void)
 
 	/* default rule should never be garbage collected */
 	V_pf_default_rule.entries.tqe_prev = &V_pf_default_rule.entries.tqe_next;
+	TUNABLE_BOOL_FETCH("net.pf.default_to_drop", &V_default_to_drop);
 	V_pf_default_rule.action = V_default_to_drop ? PF_DROP : PF_PASS;
 	V_pf_default_rule.nr = -1;
 	V_pf_default_rule.rtableid = -1;
