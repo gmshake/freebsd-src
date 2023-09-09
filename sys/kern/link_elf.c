@@ -1956,7 +1956,7 @@ link_elf_restore_vnet_default(linker_file_t lf, void *addr, size_t size)
 	MPASS(size > 0);
 	if (ef->vnet_base == 0) {
 		MPASS(lf == linker_kernel_file);
-		MPASS(VNET_START <= (uintptr_t)addr && (uintptr_t)addr + size <= VNET_STOP)
+		MPASS(VNET_START <= (uintptr_t)addr && (uintptr_t)addr + size <= VNET_STOP);
 		oaddr = (void *)((uintptr_t)linker_kernel_vnet_default + ((uintptr_t)addr - VNET_START));
 	} else {
 		MPASS((uintptr_t)ef->vnet_base <= (uintptr_t)addr &&
