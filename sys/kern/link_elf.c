@@ -215,6 +215,7 @@ static int	link_elf_preload_parse_symbols(elf_file_t);
 static struct elf_set_head set_pcpu_list;
 #ifdef VIMAGE
 static struct elf_set_head set_vnet_list;
+static void * linker_kernel_vnet_default;
 #endif
 
 static void
@@ -508,6 +509,8 @@ link_elf_init(void* arg)
 	TAILQ_INIT(&set_pcpu_list);
 #ifdef VIMAGE
 	TAILQ_INIT(&set_vnet_list);
+	linker_kernel_vnet_default = malloc(VNET_STOP - VNET_START, M_LINKER, M_WAITOK);
+	memcpy(linker_kernel_vnet_default, (void *)VNET_START, VNET_STOP - VNET_START);
 #endif
 }
 
@@ -1948,22 +1951,19 @@ static void
 link_elf_restore_vnet_default(linker_file_t lf, void *addr, size_t size)
 {
 	elf_file_t ef = (elf_file_t)lf;
+	void *oaddr;
 
+	MPASS(size > 0);
 	if (ef->vnet_base == 0) {
 		MPASS(ef == linker_kernel_file);
-		/*
-		 * TODO Restore vnet variable's default from kernel file is not
-		 * supported yet.
-		 */
-		return;
+		MPASS(VNET_START <= (uintptr_t)addr && (uintptr_t)addr + size <= VNET_STOP)
+		oaddr = (void *)((uintptr_t)linker_kernel_vnet_default + ((uintptr_t)addr - VNET_START));
+	} else {
+		MPASS((uintptr_t)ef->vnet_base <= (uintptr_t)addr &&
+		    (uintptr_t)addr + size <= (uintptr_t)ef->vnet_base + (ef->vnet_stop - ef->vnet_start));
+		oaddr = (void *)((uintptr_t)ef->vnet_start + ((uintptr_t)addr - (uintptr_t)ef->vnet_base));
 	}
-	MPASS(size > 0);
-	MPASS((void *)ef->vnet_base <= addr &&
-	    (uintptr_t)addr + size <= (uintptr_t)ef->vnet_base + (ef->vnet_stop - ef->vnet_start));
-
-	memcpy(addr,
-	    (void *)(ef->vnet_start + ((uintptr_t)addr - (uintptr_t)ef->vnet_base)),
-	    size);
+	memcpy(addr, oaddr, size);
 }
 #endif
 
