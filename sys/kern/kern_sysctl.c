@@ -978,14 +978,16 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
 
 #ifdef VIMAGE
 static void
-sysctl_setenv_vnet(void *arg __unused, char *name)
+sysctl_setenv_vnet(void *arg __unused, const char *name)
 {
+	char *p;
 	struct sysctl_oid *oidp;
 	int oid[CTL_MAXNAME];
 	int error, nlen;
 
+	p = strdup(name, M_SYSCTLOID);
 	SYSCTL_WLOCK();
-	error = name2oid(name, oid, &nlen, &oidp);
+	error = name2oid(p, oid, &nlen, &oidp);
 	if (error)
 		goto out;
 
@@ -997,16 +999,19 @@ sysctl_setenv_vnet(void *arg __unused, char *name)
 		sysctl_load_tunable_by_oid_locked(oidp);
 	}
 out:
+	free(p, M_SYSCTLOID);
 	SYSCTL_WUNLOCK();
 }
 
 static void
-sysctl_unsetenv_vnet(void *arg __unused, char *name)
+sysctl_unsetenv_vnet(void *arg __unused, const char *name)
 {
+	char *p;
 	struct sysctl_oid *oidp;
 	int oid[CTL_MAXNAME];
 	int error, nlen;
 
+	p = strdup(name, M_SYSCTLOID);
 	SYSCTL_WLOCK();
 	/*
 	 * The setenv / unsetenv event handlers are invoked by kern_setenv() /
@@ -1017,7 +1022,7 @@ sysctl_unsetenv_vnet(void *arg __unused, char *name)
 	 */
 	if (testenv(name))
 		goto out;
-	error = name2oid(name, oid, &nlen, &oidp);
+	error = name2oid(p, oid, &nlen, &oidp);
 	if (error)
 		goto out;
 
@@ -1062,6 +1067,7 @@ sysctl_unsetenv_vnet(void *arg __unused, char *name)
 		vnet_restore_init(oidp->oid_arg1, size);
 	}
 out:
+	free(p, M_SYSCTLOID);
 	SYSCTL_WUNLOCK();
 }
 
