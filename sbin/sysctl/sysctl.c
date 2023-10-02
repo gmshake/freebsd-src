@@ -65,6 +65,7 @@ static const char *conffile;
 static int	aflag, bflag, Bflag, dflag, eflag, hflag, iflag;
 static int	Nflag, nflag, oflag, qflag, tflag, Tflag, Wflag, xflag;
 static bool	Fflag, lflag;
+static bool     Jflag, jflag;
 
 static int	oidfmt(int *, int, char *, u_int *);
 static int	parsefile(const char *);
@@ -137,7 +138,7 @@ main(int argc, char **argv)
 	setbuf(stdout,0);
 	setbuf(stderr,0);
 
-	while ((ch = getopt(argc, argv, "AabB:def:FhilNnoqtTwWxX")) != -1) {
+	while ((ch = getopt(argc, argv, "AabB:def:FhiJjlNnoqtTwWxX")) != -1) {
 		switch (ch) {
 		case 'A':
 			/* compatibility */
@@ -169,6 +170,12 @@ main(int argc, char **argv)
 			break;
 		case 'i':
 			iflag = 1;
+			break;
+		case 'J':
+			Jflag = true;
+			break;
+		case 'j':
+			jflag = true;
 			break;
 		case 'l':
 			lflag = true;
@@ -1049,6 +1056,14 @@ show_var(int *oid, int nlen, bool honor_skip)
 
 	/* if Tflag then only list sysctls that are tuneables. */
 	if (Tflag && (kind & CTLFLAG_TUN) == 0)
+		return (1);
+
+	/* if Jflag then only list sysctls that are vnet variables. */
+	if (Jflag && (kind & CTLFLAG_VNET) == 0)
+		return (1);
+
+	/* if jflag then only list sysctls that are not vnet variables. */
+	if (jflag && (kind & CTLFLAG_VNET) != 0)
 		return (1);
 
 	if (Nflag) {
