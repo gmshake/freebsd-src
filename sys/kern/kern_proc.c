@@ -161,7 +161,13 @@ EVENTHANDLER_LIST_DEFINE(process_fork);
 EVENTHANDLER_LIST_DEFINE(process_exec);
 
 int kstack_pages = KSTACK_PAGES;
-SYSCTL_INT(_kern, OID_AUTO, kstack_pages, CTLFLAG_RD, &kstack_pages, 0,
+SYSCTL_INT(_kern, OID_AUTO, kstack_pages,
+#if !defined(__arm64__)
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+#else
+    CTLFLAG_RD,
+#endif
+    &kstack_pages, 0,
     "Kernel stack size in pages");
 static int vmmap_skip_res_cnt = 0;
 SYSCTL_INT(_kern, OID_AUTO, proc_vmmap_skip_resident_count, CTLFLAG_RW,
