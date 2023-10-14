@@ -213,10 +213,10 @@ SYSCTL_UINT(_hw_vmm_vmx, OID_AUTO, vpid_alloc_failed, CTLFLAG_RD,
 	    &vpid_alloc_failed, 0, NULL);
 
 int guest_l1d_flush;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RD,
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &guest_l1d_flush, 0, NULL);
 int guest_l1d_flush_sw;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RD,
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &guest_l1d_flush_sw, 0, NULL);
 
 static struct msr_entry msr_load_list[1] __aligned(16);
@@ -900,6 +900,7 @@ vmx_modinit(int ipinum)
 	guest_l1d_flush = (cpu_ia32_arch_caps &
 	    IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY) == 0;
 	TUNABLE_INT_FETCH("hw.vmm.l1d_flush", &guest_l1d_flush);
+	TUNABLE_INT_FETCH("hw.vmm.vmx.l1d_flush", &guest_l1d_flush);
 
 	/*
 	 * L1D cache flush is enabled.  Use IA32_FLUSH_CMD MSR when
@@ -912,6 +913,8 @@ vmx_modinit(int ipinum)
 		if ((cpu_stdext_feature3 & CPUID_STDEXT3_L1D_FLUSH) == 0) {
 			guest_l1d_flush_sw = 1;
 			TUNABLE_INT_FETCH("hw.vmm.l1d_flush_sw",
+			    &guest_l1d_flush_sw);
+			TUNABLE_INT_FETCH("hw.vmm.vmx.l1d_flush_sw",
 			    &guest_l1d_flush_sw);
 		}
 		if (guest_l1d_flush_sw) {

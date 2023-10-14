@@ -73,10 +73,24 @@ static int ept_pmap_flags;
 SYSCTL_INT(_hw_vmm_ept, OID_AUTO, pmap_flags, CTLFLAG_RD,
     &ept_pmap_flags, 0, NULL);
 
+static int use_superpages = 1;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_superpages,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &use_superpages, 0, NULL);
+
+static int use_hw_ad_bits = 1;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_hw_ad_bits,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &use_hw_ad_bits, 0, NULL);
+
+static int use_exec_only = 1;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_exec_only,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &use_exec_only, 0, NULL);
+
 int
 ept_init(int ipinum)
 {
-	int use_hw_ad_bits, use_superpages, use_exec_only;
 	uint64_t cap;
 
 	cap = rdmsr(MSR_VMX_EPT_VPID_CAP);
@@ -98,19 +112,16 @@ ept_init(int ipinum)
 
 	ept_pmap_flags = ipinum & PMAP_NESTED_IPIMASK;
 
-	use_superpages = 1;
 	TUNABLE_INT_FETCH("hw.vmm.ept.use_superpages", &use_superpages);
 	if (use_superpages && EPT_PDE_SUPERPAGE(cap))
 		ept_pmap_flags |= PMAP_PDE_SUPERPAGE;	/* 2MB superpage */
 
-	use_hw_ad_bits = 1;
 	TUNABLE_INT_FETCH("hw.vmm.ept.use_hw_ad_bits", &use_hw_ad_bits);
 	if (use_hw_ad_bits && AD_BITS_SUPPORTED(cap))
 		ept_enable_ad_bits = 1;
 	else
 		ept_pmap_flags |= PMAP_EMULATE_AD_BITS;
 
-	use_exec_only = 1;
 	TUNABLE_INT_FETCH("hw.vmm.ept.use_exec_only", &use_exec_only);
 	if (use_exec_only && EPT_SUPPORTS_EXEC_ONLY(cap))
 		ept_pmap_flags |= PMAP_SUPPORTS_EXEC_ONLY;
