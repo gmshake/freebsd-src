@@ -35,6 +35,8 @@
 
 struct dmar_unit;
 
+SYSCTL_DECL(_hw_dmar);
+
 /*
  * Locking annotations:
  * (u) - Protected by iommu unit lock

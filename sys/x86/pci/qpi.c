@@ -42,6 +42,7 @@
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 
 #include <machine/cputypes.h>
 #include <machine/md_var.h>
@@ -60,10 +61,13 @@ struct qpi_device {
 
 static MALLOC_DEFINE(M_QPI, "qpidrv", "qpi system device");
 
+static int do_qpi;
+SYSCTL_INT(_hw, OID_AUTO, attach_intel_csr_pci, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &do_qpi, 0, NULL);
+
 static void
 qpi_identify(driver_t *driver, device_t parent)
 {
-	int do_qpi;
 
 	/* Check CPUID to ensure this is an i7 CPU of some sort. */
 	if (cpu_vendor_id != CPU_VENDOR_INTEL ||
@@ -71,7 +75,6 @@ qpi_identify(driver_t *driver, device_t parent)
 		return;
 
 	/* Only discover buses with configuration devices if allowed by user */
-	do_qpi = 0;
 	TUNABLE_INT_FETCH("hw.attach_intel_csr_pci", &do_qpi);
 	if (!do_qpi)
 		return;

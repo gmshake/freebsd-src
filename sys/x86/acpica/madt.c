@@ -196,6 +196,10 @@ madt_x2apic_disable_reason(void)
 	return (NULL);
 }
 
+static int user_x2apic;
+SYSCTL_INT(_hw, OID_AUTO, x2apic_enable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &user_x2apic, 0, "Enable x2APIC");
+
 /*
  * Initialize the local APIC on the BSP.
  */
@@ -203,7 +207,6 @@ static int
 madt_setup_local(void)
 {
 	const char *reason;
-	int user_x2apic;
 	bool bios_x2apic;
 
 	if ((cpu_feature2 & CPUID2_X2APIC) != 0) {

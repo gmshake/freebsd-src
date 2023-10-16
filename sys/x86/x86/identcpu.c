@@ -1518,10 +1518,14 @@ identify_cpu1(void)
 	cpu_feature2 = regs[2];
 }
 
+static u_int cpu_stdext_disable;
+SYSCTL_UINT(_hw, OID_AUTO, cpu_stdext_disable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &cpu_stdext_disable, 0, "CPU extended features to be disabled");
+
 void
 identify_cpu2(void)
 {
-	u_int regs[4], cpu_stdext_disable;
+	u_int regs[4];
 
 	if (cpu_high >= 6) {
 		cpuid_count(6, 0, regs);
@@ -1541,7 +1545,6 @@ identify_cpu2(void)
 		 * extensions, activation of which requires setting a
 		 * bit in CR4, and which VM monitors do not support.
 		 */
-		cpu_stdext_disable = 0;
 		TUNABLE_INT_FETCH("hw.cpu_stdext_disable", &cpu_stdext_disable);
 		cpu_stdext_feature &= ~cpu_stdext_disable;
 

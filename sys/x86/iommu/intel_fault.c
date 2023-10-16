@@ -257,15 +257,19 @@ dmar_clear_faults(struct dmar_unit *unit)
 	dmar_write4(unit, DMAR_FSTS_REG, fsts);
 }
 
+static int fault_log_size = 256; /* 128 fault log entries */
+SYSCTL_INT(_hw_dmar, OID_AUTO, fault_log_size, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &fault_log_size, 0, "DMAR fault log size (must be even)");
+
 int
 dmar_init_fault_log(struct dmar_unit *unit)
 {
 
 	mtx_init(&unit->fault_lock, "dmarflt", NULL, MTX_SPIN);
-	unit->fault_log_size = 256; /* 128 fault log entries */
-	TUNABLE_INT_FETCH("hw.dmar.fault_log_size", &unit->fault_log_size);
-	if (unit->fault_log_size % 2 != 0)
+	TUNABLE_INT_FETCH("hw.dmar.fault_log_size", &fault_log_size);
+	if (fault_log_size % 2 != 0)
 		panic("hw.dmar_fault_log_size must be even");
+	unit->fault_log_size = fault_log_size;
 	unit->fault_log = malloc(sizeof(uint64_t) * unit->fault_log_size,
 	    M_DEVBUF, M_WAITOK | M_ZERO);
 

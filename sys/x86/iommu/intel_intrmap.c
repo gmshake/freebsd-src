@@ -322,23 +322,28 @@ clp2(u_int v)
 	return (powerof2(v) ? v : 1 << fls(v));
 }
 
+static int ir_enabled = 0;
+SYSCTL_INT(_hw_dmar, OID_AUTO, ir, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &ir_enabled, 0, "Enable DMAR IR");
+
 int
 dmar_init_irt(struct dmar_unit *unit)
 {
 
 	if ((unit->hw_ecap & DMAR_ECAP_IR) == 0)
 		return (0);
-	unit->ir_enabled = 1;
-	TUNABLE_INT_FETCH("hw.dmar.ir", &unit->ir_enabled);
-	if (!unit->ir_enabled)
+	ir_enabled = 1;
+	TUNABLE_INT_FETCH("hw.dmar.ir", &ir_enabled);
+	if (!ir_enabled)
 		return (0);
 	if (!unit->qi_enabled) {
-		unit->ir_enabled = 0;
+		ir_enabled = 0;
 		if (bootverbose)
 			device_printf(unit->dev,
 	     "QI disabled, disabling interrupt remapping\n");
 		return (0);
 	}
+	unit->ir_enabled = ir_enabled;
 	unit->irte_cnt = clp2(num_io_irqs);
 	unit->irt = kmem_alloc_contig(unit->irte_cnt * sizeof(dmar_irte_t),
 	    M_ZERO | M_WAITOK, 0, dmar_high, PAGE_SIZE, 0,

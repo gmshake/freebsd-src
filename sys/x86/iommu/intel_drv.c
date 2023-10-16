@@ -81,6 +81,8 @@
 #define	DMAR_QI_IRQ_RID		1
 #define	DMAR_REG_RID		2
 
+SYSCTL_NODE(_hw, OID_AUTO, dmar, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, NULL);
+
 static device_t *dmar_devs;
 static int dmar_devcnt;
 
@@ -158,6 +160,9 @@ dmar_count_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 }
 
 static int dmar_enable = 0;
+SYSCTL_INT(_hw_dmar, OID_AUTO, enable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &dmar_enable, 0, "Enable DMA remapping reporting");
+
 static void
 dmar_identify(driver_t *driver, device_t parent)
 {
@@ -396,13 +401,18 @@ dmar_print_caps(device_t dev, struct dmar_unit *unit,
 	    DMAR_ECAP_IRO(unit->hw_ecap));
 }
 
+static int disable_pmr;
+static SYSCTL_NODE(_hw_dmar, OID_AUTO, pmr, CTLFLAG_RD | CTLFLAG_MPSAFE,
+    NULL, NULL);
+SYSCTL_INT(_hw_dmar_pmr, OID_AUTO, disable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &disable_pmr, 0, "Disable protected memory regions");
+
 static int
 dmar_attach(device_t dev)
 {
 	struct dmar_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	uint64_t timeout;
-	int disable_pmr;
 	int i, error;
 
 	unit = device_get_softc(dev);
@@ -527,7 +537,6 @@ dmar_attach(device_t dev)
 		return (error);
 	}
 
-	disable_pmr = 0;
 	TUNABLE_INT_FETCH("hw.dmar.pmr.disable", &disable_pmr);
 	if (disable_pmr) {
 		error = dmar_disable_protected_regions(unit);

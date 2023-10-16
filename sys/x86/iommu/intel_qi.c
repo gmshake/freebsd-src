@@ -467,19 +467,27 @@ dmar_qi_task(void *arg, int pending __unused)
 	}
 }
 
+static int qi_enabled;
+SYSCTL_INT(_hw_dmar, OID_AUTO, qi, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &qi_enabled, 0, "Enable queued invalidation interface");
+
+static int qi_sz;
+SYSCTL_INT(_hw_dmar, OID_AUTO, qi_size, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &qi_sz, 0, "Invalidation queue size");
+
 int
 dmar_init_qi(struct dmar_unit *unit)
 {
 	uint64_t iqa;
 	uint32_t ics;
-	int qi_sz;
 
 	if (!DMAR_HAS_QI(unit) || (unit->hw_cap & DMAR_CAP_CM) != 0)
 		return (0);
-	unit->qi_enabled = 1;
-	TUNABLE_INT_FETCH("hw.dmar.qi", &unit->qi_enabled);
-	if (!unit->qi_enabled)
+	qi_enabled = 1;
+	TUNABLE_INT_FETCH("hw.dmar.qi", &qi_enabled);
+	if (!qi_enabled)
 		return (0);
+	unit->qi_enabled = qi_enabled;
 
 	unit->tlb_flush_head = unit->tlb_flush_tail =
             iommu_gas_alloc_entry(NULL, 0);
