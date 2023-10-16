@@ -167,6 +167,11 @@ SYSCTL_INT(_hw, HW_FLOATINGPT, floatingpoint, CTLFLAG_RD,
 
 int use_xsave;			/* non-static for cpu_switch.S */
 uint64_t xsave_mask;		/* the same */
+SYSCTL_INT(_hw, OID_AUTO, use_xsave, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &use_xsave, 0, "Use the XSAVE CPU feature");
+SYSCTL_U64(_hw, OID_AUTO, xsave_mask, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &xsave_mask, 0, "Enabled XSAVE instructions");
+
 static	uma_zone_t fpu_save_area_zone;
 static	struct savefpu *fpu_initialstate;
 

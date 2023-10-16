@@ -73,10 +73,21 @@ static int ept_pmap_flags;
 SYSCTL_INT(_hw_vmm_ept, OID_AUTO, pmap_flags, CTLFLAG_RD,
     &ept_pmap_flags, 0, NULL);
 
+static int use_superpages;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_superpages,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &use_superpages, 0, NULL);
+
+static int use_hw_ad_bits;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_hw_ad_bits,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &use_hw_ad_bits, 0, NULL);
+
+static int use_exec_only;
+SYSCTL_INT(_hw_vmm_ept, OID_AUTO, use_exec_only,
+    CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &use_exec_only, 0, NULL);
+
 int
 ept_init(int ipinum)
 {
-	int use_hw_ad_bits, use_superpages, use_exec_only;
 	uint64_t cap;
 
 	cap = rdmsr(MSR_VMX_EPT_VPID_CAP);

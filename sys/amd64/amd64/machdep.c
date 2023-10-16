@@ -848,6 +848,12 @@ native_parse_memmap(caddr_t kmdp, vm_paddr_t *physmap, int *physmap_idx)
 
 #define	PAGES_PER_GB	(1024 * 1024 * 1024 / PAGE_SIZE)
 
+static u_long memtest;
+static SYSCTL_NODE(_hw, OID_AUTO, memtest, CTLFLAG_RW | CTLFLAG_MPSAFE,
+    NULL, NULL);
+SYSCTL_ULONG(_hw_memtest, OID_AUTO, tests, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &memtest, 0, "Enable boot memory test");
+
 /*
  * Populate the (physmap) array with base/bound pairs describing the
  * available physical memory in the system, then test this memory and
@@ -863,7 +869,7 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 {
 	int i, physmap_idx, pa_indx, da_indx;
 	vm_paddr_t pa, physmap[PHYS_AVAIL_ENTRIES];
-	u_long physmem_start, physmem_tunable, memtest;
+	u_long physmem_start, physmem_tunable;
 	pt_entry_t *pte;
 	quad_t dcons_addr, dcons_size;
 	int page_counter;
@@ -922,7 +928,6 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 	 * A general name is used as the code may be extended to support
 	 * additional tests beyond the current "page present" test.
 	 */
-	memtest = 0;
 	TUNABLE_ULONG_FETCH("hw.memtest.tests", &memtest);
 
 	/*

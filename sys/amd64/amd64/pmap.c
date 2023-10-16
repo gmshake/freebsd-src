@@ -2456,6 +2456,10 @@ pmap_init_pv_table(void)
 }
 #endif
 
+static int skz63;
+SYSCTL_INT(_hw, OID_AUTO, skz63_enable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &skz63, 0, "Skylake-X errata SKZ63");
+
 /*
  *	Initialize the pmap module.
  *	Called by vm_init, to initialize any structures that the pmap
@@ -2466,7 +2470,7 @@ pmap_init(void)
 {
 	struct pmap_preinit_mapping *ppim;
 	vm_page_t m, mpte;
-	int error, i, ret, skz63;
+	int error, i, ret;
 
 	/* L1TF, reserve page @0 unconditionally */
 	vm_page_blacklist_add(0, bootverbose);

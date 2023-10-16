@@ -60,6 +60,9 @@ SYSCTL_INT(_hw, OID_AUTO, lower_amd64_sharedpage, CTLFLAG_RDTUN,
  *  1: force disable CLFLUSH
  */
 static int	hw_clflush_disable = -1;
+SYSCTL_INT(_hw, OID_AUTO, clflush_disable, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
+    &hw_clflush_disable, 0,
+    "Disable kernel's use of CLFLUSH / CLFLUSHOPT. (-1: automatic, 0: keep enable, 1: force disable)");
 
 static void
 init_amd(void)
