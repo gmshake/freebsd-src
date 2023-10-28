@@ -546,7 +546,7 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 		return;
 	}
 	eh = mtod(m, struct ether_header *);
-	etype = ntohs(eh->ether_type);
+	etype = eh->ether_type;
 	random_harvest_queue_ether(m, sizeof(*m));
 
 #ifdef EXPERIMENTAL
@@ -555,9 +555,9 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 	/* Catch ETHERTYPE_IP, and ETHERTYPE_[REV]ARP if we are v6-only. */
 	if ((ND_IFINFO(ifp)->flags & ND6_IFF_IPV6_ONLY_MASK) != 0) {
 		switch (etype) {
-		case ETHERTYPE_IP:
-		case ETHERTYPE_ARP:
-		case ETHERTYPE_REVARP:
+		case htons(ETHERTYPE_IP):
+		case htons(ETHERTYPE_ARP):
+		case htons(ETHERTYPE_REVARP):
 			m_freem(m);
 			return;
 			/* NOTREACHED */
@@ -629,7 +629,8 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 	 * path correctly.
 	 */
 	if ((m->m_flags & M_VLANTAG) == 0 &&
-	    ((etype == ETHERTYPE_VLAN) || (etype == ETHERTYPE_QINQ))) {
+	    (etype == htons(ETHERTYPE_VLAN) ||
+	     etype == htons(ETHERTYPE_QINQ))) {
 		struct ether_vlan_header *evl;
 
 		if (m->m_len < sizeof(*evl) &&
