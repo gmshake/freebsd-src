@@ -2583,10 +2583,6 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 
 	/* Allocate an ifnet and set it up */
 	ifp = if_alloc_dev(IFT_ETHER, dev);
-	if (ifp == NULL) {
-		device_printf(dev, "Cannot allocate ifnet\n");
-		return (ENOMEM);
-	}
 	vi->ifp = ifp;
 	if_setsoftc(ifp, vi);
 

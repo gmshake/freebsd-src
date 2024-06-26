@@ -2470,10 +2470,6 @@ ena_setup_ifnet(device_t pdev, struct ena_adapter *adapter,
 	int caps = 0;
 
 	ifp = adapter->ifp = if_gethandle(IFT_ETHER);
-	if (unlikely(ifp == NULL)) {
-		ena_log(pdev, ERR, "can not allocate ifnet structure\n");
-		return (ENXIO);
-	}
 	if_initname(ifp, device_get_name(pdev), device_get_unit(pdev));
 	if_setdev(ifp, pdev);
 	if_setsoftc(ifp, adapter);

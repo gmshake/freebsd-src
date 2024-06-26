@@ -2104,8 +2104,6 @@ oce_attach_ifp(POCE_SOFTC sc)
 {
 
 	sc->ifp = if_alloc(IFT_ETHER);
-	if (!sc->ifp)
-		return ENOMEM;
 
 	ifmedia_init(&sc->media, IFM_IMASK, oce_media_change, oce_media_status);
 	ifmedia_add(&sc->media, IFM_ETHER | IFM_AUTO, 0, NULL);

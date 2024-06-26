@@ -359,11 +359,6 @@ gve_setup_ifnet(device_t dev, struct gve_priv *priv)
 	if_t ifp;
 
 	ifp = priv->ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(priv->dev, "Failed to allocate ifnet struct\n");
-		return (ENXIO);
-	}
-
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	if_setsoftc(ifp, priv);
 	if_setdev(ifp, dev);

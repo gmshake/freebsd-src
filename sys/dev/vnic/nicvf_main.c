@@ -335,11 +335,6 @@ nicvf_setup_ifnet(struct nicvf *nic)
 	if_t ifp;
 
 	ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL) {
-		device_printf(nic->dev, "Could not allocate ifnet structure\n");
-		return (ENOMEM);
-	}
-
 	nic->ifp = ifp;
 
 	if_setsoftc(ifp, nic);

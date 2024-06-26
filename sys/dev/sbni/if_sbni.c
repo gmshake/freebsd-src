@@ -220,8 +220,6 @@ sbni_attach(struct sbni_softc *sc, int unit, struct sbni_flags flags)
 	uint64_t baudrate;
    
 	ifp = sc->ifp = if_alloc(IFT_ETHER);
-	if (ifp == NULL)
-		return (ENOMEM);
 	sbni_outb(sc, CSR0, 0);
 	set_initial_values(sc, flags);
 

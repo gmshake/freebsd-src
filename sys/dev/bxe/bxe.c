@@ -12985,10 +12985,7 @@ bxe_init_ifnet(struct bxe_softc *sc)
 	BLOGI(sc, "IFMEDIA flags : %x\n", sc->ifmedia.ifm_media);
 
     /* allocate the ifnet structure */
-    if ((ifp = if_gethandle(IFT_ETHER)) == NULL) {
-        BLOGE(sc, "Interface allocation failed!\n");
-        return (ENXIO);
-    }
+    ifp = if_gethandle(IFT_ETHER);
 
     if_setsoftc(ifp, sc);
     if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
