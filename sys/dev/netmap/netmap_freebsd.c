@@ -600,7 +600,7 @@ nm_os_vi_persist(const char *name, if_t *ret)
 	int unit = nm_vi_get_index(); /* just to decide MAC address */
 
 	if (unit < 0)
-		return (EBUSY);
+		return EBUSY;
 	/*
 	 * We use the same MAC address generation method with tap
 	 * except for the highest octet is 00:be instead of 00:bd
@@ -624,7 +624,7 @@ nm_os_vi_persist(const char *name, if_t *ret)
 
 	ether_ifattach(ifp, eaddr);
 	*ret = ifp;
-	return (0);
+	return 0;
 }
 
 /* unregister from the system and drop the final refcount */
