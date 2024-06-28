@@ -2693,7 +2693,7 @@ cxgbe_attach(device_t dev)
 	struct port_info *pi = device_get_softc(dev);
 	struct adapter *sc = pi->adapter;
 	struct vi_info *vi;
-	int i, rc;
+	int i;
 
 	sysctl_ctx_init(&pi->ctx);
 
