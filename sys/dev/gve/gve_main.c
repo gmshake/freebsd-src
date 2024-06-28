@@ -352,7 +352,7 @@ gve_get_counter(if_t ifp, ift_counter cnt)
 	}
 }
 
-static int
+static void
 gve_setup_ifnet(device_t dev, struct gve_priv *priv)
 {
 	int caps = 0;
@@ -396,8 +396,6 @@ gve_setup_ifnet(device_t dev, struct gve_priv *priv)
 
 	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO);
-
-	return (0);
 }
 
 static int
@@ -789,9 +787,7 @@ gve_attach(device_t dev)
 	if (err != 0)
 		goto abort;
 
-	err = gve_setup_ifnet(dev, priv);
-	if (err != 0)
-		goto abort;
+	gve_setup_ifnet(dev, priv);
 
 	priv->rx_copybreak = GVE_DEFAULT_RX_COPYBREAK;
 

@@ -197,7 +197,7 @@ fwip_attach(device_t dev)
 	splx(s);
 
 	FWIPDEBUG(ifp, "interface created\n");
-	return 0;
+	return (0);
 }
 
 static void

@@ -12965,7 +12965,7 @@ bxe_init(void *xsc)
     BXE_CORE_UNLOCK(sc);
 }
 
-static int
+static void
 bxe_init_ifnet(struct bxe_softc *sc)
 {
     if_t ifp;
@@ -13031,8 +13031,6 @@ bxe_init_ifnet(struct bxe_softc *sc)
 
     /* Attach driver debugnet methods. */
     DEBUGNET_SET(ifp, bxe);
-
-    return (0);
 }
 
 static void
@@ -16258,12 +16256,7 @@ bxe_attach(device_t dev)
     bxe_get_phy_info(sc);
 
     /* initialize the FreeBSD ifnet interface */
-    if (bxe_init_ifnet(sc) != 0) {
-        bxe_release_mutexes(sc);
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
-    }
+    bxe_init_ifnet(sc);
 
     if (bxe_add_cdev(sc) != 0) {
         if (sc->ifp != NULL) {

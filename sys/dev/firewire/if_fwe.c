@@ -197,7 +197,7 @@ fwe_attach(device_t dev)
 	if_setcapenablebit(ifp, IFCAP_VLAN_MTU, 0);
 
 	FWEDEBUG(ifp, "interface created\n");
-	return 0;
+	return (0);
 }
 
 static void
